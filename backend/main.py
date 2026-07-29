@@ -294,14 +294,17 @@ def run_heavy_sync_job():
 async def startup():
     global _main_event_loop
     _main_event_loop = asyncio.get_running_loop()
-    # Warm up SentenceTransformer model to optimize APEX causal engine latency
-    try:
-        logger.info("[STARTUP] Warming up APEX SentenceTransformer model...")
-        from entity_interface.apex_causal import get_encoder
-        get_encoder()
-        logger.info("[STARTUP] APEX SentenceTransformer model warmed up successfully.")
-    except Exception as e:
-        logger.warning(f"[STARTUP] Warning: Failed to warm up SentenceTransformer: {e}")
+    # Warm up SentenceTransformer model in background to avoid blocking Uvicorn startup
+    async def _async_warmup():
+        try:
+            logger.info("[STARTUP] Warming up APEX SentenceTransformer model in background...")
+            from entity_interface.apex_causal import get_encoder
+            await asyncio.to_thread(get_encoder)
+            logger.info("[STARTUP] APEX SentenceTransformer model warmed up successfully.")
+        except Exception as e:
+            logger.warning(f"[STARTUP] Warning: Failed to warm up SentenceTransformer: {e}")
+
+    asyncio.create_task(_async_warmup())
 
     await init_redis()
     await init_db()
