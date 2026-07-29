@@ -5,8 +5,16 @@ np.float_ = np.float64
 import os
 import logging
 from datetime import datetime
-import chromadb
-from chromadb import EmbeddingFunction, Documents, Embeddings
+
+try:
+    import chromadb
+    from chromadb import EmbeddingFunction, Documents, Embeddings
+    HAVE_CHROMADB = True
+except ImportError:
+    HAVE_CHROMADB = False
+    EmbeddingFunction = object
+    Documents = list
+    Embeddings = list
 
 logger = logging.getLogger("sera.vector_store")
 
@@ -34,6 +42,9 @@ class VectorStoreService:
     def _get_collection(cls):
         if cls._collection is not None:
             return cls._collection
+
+        if not HAVE_CHROMADB:
+            return None
 
         try:
             # Resolve directory for Chroma storage inside backend/data/
