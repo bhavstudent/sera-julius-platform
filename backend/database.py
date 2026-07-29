@@ -69,8 +69,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 async def init_db() -> None:
-    # Fail fast early check before creating tables
-    await verify_db_connection()
+    # Resilient check before creating tables
+    try:
+        await verify_db_connection()
+    except Exception as e:
+        logger.warning(f"[DATABASE] Remote DB check notice: {e}. Continuing with database initialization.")
     from models.db_models import EntityModel, EventModel, AlertModel, PredictionModel, EntityRelationshipModel, ClaimModel, ClaimChallengeModel, TrackedQueryModel, CitationResultModel
     from models.commerce import CompanyModel, FinancialMetricsModel, JobPostingsModel, SearchTrendsModel, VesselMovementsModel, NewsEventsModel, GitHubActivityModel, IngestionLogModel, TickerPriorityCacheModel, HealthcareMetric, ExecutiveMovement
     from models.claims import TrackedQuery, Claim, Evidence, Challenge

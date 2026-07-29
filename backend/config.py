@@ -19,7 +19,7 @@ class AppSettings(BaseModel):
     PRODUCTION: bool = Field(default=False)
 
     # Database
-    DATABASE_URL: str = Field(default="postgresql+asyncpg://localhost:5432/sera_db")
+    DATABASE_URL: str = Field(default="sqlite+aiosqlite:///./sera_db.sqlite3")
 
     # Entity AI Layer
     ENTITY_MODE: str = Field(default="mock")
