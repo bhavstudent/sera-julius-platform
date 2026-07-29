@@ -311,9 +311,21 @@ async def startup():
 
     asyncio.create_task(_async_warmup())
 
-    await init_redis()
-    await init_db()
-    await entity_registry._bootstrap_async()
+    try:
+        await init_redis()
+    except Exception as e:
+        logger.warning(f"[STARTUP] Redis init notice: {e}")
+
+    try:
+        await init_db()
+    except Exception as e:
+        logger.warning(f"[STARTUP] DB init notice: {e}")
+
+    try:
+        await entity_registry._bootstrap_async()
+    except Exception as e:
+        logger.warning(f"[STARTUP] Registry bootstrap notice: {e}")
+
     asyncio.create_task(auto_godel_loop())
     try:
         from services.threat_broadcaster import start_threat_services

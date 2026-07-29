@@ -26,7 +26,8 @@ async def init_redis() -> None:
             password=REDIS_PASSWORD or None,
             db=REDIS_DB,
             decode_responses=True,
-            socket_timeout=2.0
+            socket_timeout=1.0,
+            socket_connect_timeout=1.0
         )
         await client.ping()
         _redis_client = client
