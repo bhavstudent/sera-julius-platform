@@ -187,6 +187,11 @@ app.add_middleware(
     allow_headers=["X-API-Key", "Content-Type", "Authorization"],
 )
 
+@app.get("/")
+@app.get("/health")
+async def health_check_root():
+    return {"status": "ok", "service": "sera-julius-backend", "version": "1.0"}
+
 app.include_router(dashboard.router)
 app.include_router(entities.router, prefix="/api/entities", tags=["entities"])
 app.include_router(axiom.router)
