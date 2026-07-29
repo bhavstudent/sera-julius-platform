@@ -364,5 +364,80 @@ async def get_news(domain: str = Query(default="all")):
 
 @router.get("/classified")
 async def get_classified():
-    # Return the classified briefs database
-    return CLASSIFIED_DATABASE
+    """
+    Fetch real-time critical CVEs from NVD NIST API and format them as live Classified Intelligence Briefs.
+    Falls back to GDELT cybersecurity feeds if NVD is slow/unreachable.
+    """
+    import httpx, datetime
+    HEADERS = {"User-Agent": "SERA-Platform/2.0 (research@sera-platform.io)"}
+    briefs = []
+    
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            r = await client.get(
+                "https://services.nvd.nist.gov/rest/json/cves/2.0",
+                params={"resultsPerPage": 6},
+                timeout=httpx.Timeout(10.0),
+                headers=HEADERS
+            )
+            if r.status_code == 200:
+                vulns = r.json().get("vulnerabilities", [])
+                for i, v in enumerate(vulns):
+                    cve_obj = v.get("cve", {})
+                    cve_id = cve_obj.get("id", f"CVE-LIVE-{i}")
+                    desc = cve_obj.get("descriptions", [{}])[0].get("value", "Critical security telemetry finding.")
+                    metrics = cve_obj.get("metrics", {}).get("cvssMetricV31", [{}])[0].get("cvssData", {})
+                    score = metrics.get("baseScore", 8.5)
+                    severity = metrics.get("baseSeverity", "CRITICAL" if i < 2 else "HIGH")
+                    
+                    classification = "EYES ONLY" if severity == "CRITICAL" else ("TOP SECRET" if i < 3 else "SECRET")
+                    clearance = "LEVEL 5 (ADMIN)" if severity == "CRITICAL" else ("LEVEL 4 (DIRECTOR)" if i < 3 else "LEVEL 3 (ANALYST)")
+                    
+                    # Create redacted summary
+                    words = desc.split()
+                    redacted = " ".join([w if idx % 3 != 0 else "[REDACTED]" for idx, w in enumerate(words[:40])])
+                    
+                    briefs.append({
+                        "id": f"brief-{cve_id.lower()}",
+                        "classification": classification,
+                        "title": f"Critical Vulnerability Directive: {cve_id}",
+                        "summary": desc[:220] + ("..." if len(desc) > 220 else ""),
+                        "redacted_content": f"Telemetry report for {cve_id}: {redacted}... Base Score: {score}",
+                        "expires_in": 300 + (i * 120),
+                        "source": f"NVD-NIST (Live {cve_id})",
+                        "date": datetime.datetime.utcnow().strftime("%Y-%m-%d"),
+                        "clearance_level": clearance
+                    })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("NVD live classified fetch failed: %s", e)
+
+    if not briefs:
+        # Fallback to GDELT live stream if NVD is unavailable
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                r = await client.get(
+                    "https://api.gdeltproject.org/api/v2/doc/doc",
+                    params={"query": "cyberattack zero-day vulnerability", "mode": "artlist", "maxrecords": "5", "format": "json"},
+                    timeout=httpx.Timeout(8.0),
+                    headers=HEADERS
+                )
+                if r.status_code == 200:
+                    articles = r.json().get("articles", [])
+                    for i, a in enumerate(articles):
+                        t = a.get("title", "Intercepted Telemetry Event")
+                        briefs.append({
+                            "id": f"brief-gdelt-{i}",
+                            "classification": "TOP SECRET",
+                            "title": f"Intercepted Feed: {t[:60]}",
+                            "summary": f"Live intelligence intercept: {t}",
+                            "redacted_content": f"Operational intercept from [{a.get('domain','SIGINT')}]: [REDACTED] anomaly detected in live stream.",
+                            "expires_in": 450,
+                            "source": a.get("domain", "SIGINT-GDELT"),
+                            "date": datetime.datetime.utcnow().strftime("%Y-%m-%d"),
+                            "clearance_level": "LEVEL 4 (DIRECTOR)"
+                        })
+        except Exception:
+            pass
+
+    return briefs

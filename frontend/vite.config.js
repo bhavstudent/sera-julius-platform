@@ -7,10 +7,18 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8000',
-      '/ws': {
-        target: 'ws://localhost:8000',
-        ws: true
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        proxyTimeout: 30000,
+        timeout: 30000,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('proxy error', err.message)
+          })
+        }
       }
     }
   },

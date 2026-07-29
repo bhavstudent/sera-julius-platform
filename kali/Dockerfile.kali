@@ -1,0 +1,42 @@
+# =====================================================================
+# SERA Platform — Custom Kali Linux Sidecar
+# Provides security tools for ReconAgent & AutonomousScanner
+# =====================================================================
+FROM kalilinux/kali-rolling:latest
+
+# Avoid interactive prompts during package install
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update and install core security & recon tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Network tools
+    nmap \
+    netcat-openbsd \
+    curl \
+    wget \
+    iputils-ping \
+    net-tools \
+    traceroute \
+    dnsutils \
+    whois \
+    # Web recon
+    nikto \
+    dirb \
+    # Exploit / audit
+    metasploit-framework \
+    sqlmap \
+    # Enumeration
+    gobuster \
+    # Password / hash
+    john \
+    hashcat \
+    # General utilities
+    python3 \
+    python3-pip \
+    git \
+    jq \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Keep container alive as persistent sidecar
+CMD ["tail", "-f", "/dev/null"]

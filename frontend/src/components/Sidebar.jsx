@@ -3,121 +3,175 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchZolaStatus } from '../api/client'
 
 const links = [
-  { path: '/', icon: '⬡', label: 'Dashboard' },
-  { path: '/entities', icon: '◈', label: 'Entities' },
+  { path: '/dashboard', icon: '📊', label: 'Dashboard' },
+  { path: '/security', icon: '🛡️', label: 'Security Console', badge: 'STYX' },
+  { path: '/zola', icon: '🔮', label: 'Causal Engine', badge: 'KRONOS' },
+  { path: '/intel', icon: '🕵️', label: 'Dark Intel', badge: 'CLASSIFIED' },
+  { path: '/entities', icon: '🏢', label: 'Entity Registry' },
+  { path: '/synthesize', icon: '⚡', label: 'Signal Synthesis' },
+  { path: '/graph', icon: '🕸️', label: 'Knowledge Graph' },
+  { path: '/claims', icon: '⚖️', label: 'Claim Credibility' },
+  { path: '/geo', icon: '🎯', label: 'Citation Tracking' },
   { path: '/axiom', icon: '∿', label: 'AXIOM-Φ Monitor' },
-  { path: '/zola', icon: '◎', label: 'ZOLA Predictions' },
-  { path: '/ai', icon: '✦', label: 'AI Command' },
-  { path: '/intel', icon: '⚠', label: 'Dark Intel' },
+  { path: '/causal-graph', icon: '📐', label: 'Causal Geometry' },
+  { path: '/healthcare', icon: '🏥', label: 'Healthcare CMS' },
+  { path: '/executive', icon: '👔', label: 'Executive Intel' },
+  { path: '/ai', icon: '💬', label: 'AI Command' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [zolaStatus, setZolaStatus] = useState({
-    entity_mode: 'mock',
-    stats: { virtual_parameters: 13000000000 },
-    actual_stored_params: 0,
-    wave_basis_size_kb: 0.0
-  })
+  const [hoveredItem, setHoveredItem] = useState(null)
+  const [zolaStatus, setZolaStatus] = useState(null)
+  // On mobile (<768px) sidebar slides fully off-screen; this tracks overlay visibility
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   useEffect(() => {
     fetchZolaStatus().then(setZolaStatus).catch(() => {})
-    const i = setInterval(() => {
-      fetchZolaStatus().then(setZolaStatus).catch(() => {})
-    }, 8000)
-    return () => clearInterval(i)
   }, [])
 
-  const virtualParams = zolaStatus?.stats?.virtual_parameters ?? 13000000000
-  const isOneQuadrillion = virtualParams >= 1e15
-  const actualStoredParams = zolaStatus?.actual_stored_params ?? 0
-  const waveBasisKb = zolaStatus?.wave_basis_size_kb ?? 0.0
+  // Close mobile drawer when route changes
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
-  // Calculate percentage of 1Q parameters reached (up to 100%)
-  const maxParams = 1e15
-  const paramProgress = Math.min((virtualParams / maxParams) * 100, 100)
+  const handleNavClick = (path) => {
+    navigate(path)
+    if (window.innerWidth < 768) setMobileOpen(false)
+  }
+
+  const toggleCollapse = () => {
+    if (window.innerWidth < 768) {
+      setMobileOpen(prev => !prev)
+    } else {
+      setCollapsed && setCollapsed(prev => !prev)
+    }
+  }
+
+  // On mobile, sidebar is always "hidden" unless mobileOpen
+  const sidebarClass = [
+    'sidebar',
+    collapsed && window.innerWidth >= 768 ? 'collapsed' : '',
+    window.innerWidth < 768 && !mobileOpen ? 'mobile-hidden' : '',
+    window.innerWidth < 768 && mobileOpen ? 'mobile-open' : '',
+  ].filter(Boolean).join(' ')
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-logo">
-        <h1>SERA</h1>
-        <span>Intelligence Platform</span>
-      </div>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {links.map(link => (
-          <div
-            key={link.path}
-            className={`nav-item ${location.pathname === link.path ? 'active' : ''}`}
-            onClick={() => navigate(link.path)}
-          >
-            <span className="nav-icon" style={{ fontSize: 18 }}>{link.icon}</span>
-            <span>{link.label}</span>
-          </div>
-        ))}
-      </div>
-      
-      <div className="sidebar-status">
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '1px', fontWeight: 'bold' }}>SYSTEM STATUS</div>
-        <div style={{ fontSize: 12, color: 'var(--cyan)', display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          <span className="status-dot" />
-          <span>All Nodes Synchronized</span>
+    <>
+      {/* ── Hamburger Toggle Button (always visible) ── */}
+      <button
+        className="sidebar-toggle-btn"
+        onClick={toggleCollapse}
+        aria-label="Toggle sidebar"
+      >
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+      </button>
+
+      {/* ── Mobile Backdrop Overlay ── */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar Panel ── */}
+      <aside className={sidebarClass}>
+        {/* Brand Header */}
+        <div className="sidebar-brand" onClick={() => handleNavClick('/dashboard')}>
+          <div className="brand-logo-glow">🛡️</div>
+          {(!collapsed || window.innerWidth < 768) && (
+            <div className="brand-text">
+              <div className="brand-name">CYBERSPACE</div>
+              <div className="brand-sub">INTELLIGENCE PLATFORM</div>
+            </div>
+          )}
+          {/* Collapse toggle arrow (desktop only) */}
+          {window.innerWidth >= 768 && (
+            <button
+              className="collapse-arrow-btn"
+              onClick={(e) => { e.stopPropagation(); setCollapsed && setCollapsed(p => !p) }}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? '›' : '‹'}
+            </button>
+          )}
         </div>
-        
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-muted)' }}>MODE:</span> 
-            <span style={{ color: 'var(--cyan)', fontWeight: 'bold' }}>{(zolaStatus?.entity_mode || 'mock').toUpperCase()}</span>
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'column', gap: 4 }}>
-            {/* Row 1: Actual stored params */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>STORED PARAMS</div>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', opacity: 0.6 }}>wave basis (compact)</div>
+
+        {/* Navigation Links */}
+        <div className="sidebar-menu">
+          {links.map(link => {
+            const isActive = location.pathname === link.path
+            return (
+              <div
+                key={link.path}
+                className={`menu-item ${isActive ? 'active' : ''}`}
+                title={collapsed && window.innerWidth >= 768 ? `${link.icon} ${link.label}` : ''}
+                onClick={() => handleNavClick(link.path)}
+                onMouseEnter={() => setHoveredItem(link.path)}
+                onMouseLeave={() => setHoveredItem(null)}
+              >
+                <span className="menu-icon">{link.icon}</span>
+                {(!collapsed || window.innerWidth < 768) && (
+                  <span className="menu-label">{link.label}</span>
+                )}
+                {(!collapsed || window.innerWidth < 768) && link.badge && (
+                  <span className={`menu-badge ${link.badge === 'STYX' ? 'crimson' : ''}`}>
+                    {link.badge}
+                  </span>
+                )}
+
+                {/* Tooltip on collapsed desktop */}
+                {collapsed && window.innerWidth >= 768 && hoveredItem === link.path && (
+                  <div className="hover-tooltip">
+                    <span style={{ fontSize: '14px' }}>{link.icon}</span>
+                    <span style={{ fontWeight: '800', letterSpacing: '0.5px' }}>{link.label}</span>
+                    {link.badge && (
+                      <span style={{
+                        fontSize: '9px',
+                        background: 'rgba(255, 42, 32, 0.3)',
+                        color: '#ff2a20',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(255, 42, 32, 0.5)',
+                        marginLeft: '4px'
+                      }}>
+                        {link.badge}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-              <span style={{ color: 'var(--cyan)', fontWeight: 'bold', textAlign: 'right' }}>
-                {actualStoredParams.toLocaleString()}
+            )
+          })}
+        </div>
+
+        {/* Bottom Operational Status */}
+        <div style={{
+          padding: (collapsed && window.innerWidth >= 768) ? '12px 0' : '14px 20px',
+          borderTop: '1px solid rgba(255, 42, 32, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: (collapsed && window.innerWidth >= 768) ? 'center' : 'space-between',
+          marginTop: 'auto'
+        }}>
+          {(!collapsed || window.innerWidth < 768) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="live-pulse-dot" />
+              <span className="mono" style={{ fontSize: '10px', color: '#10b981', fontWeight: 'bold' }}>
+                OPERATIONAL
               </span>
             </div>
-
-            {/* Row 2: Virtual field parameters */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>TRAINED PARAMS</div>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', opacity: 0.6 }}>CIFN wave basis (live)</div>
-              </div>
-              <span style={{ color: 'var(--blue)', fontWeight: 'bold', textAlign: 'right' }}>
-                {zolaStatus?.virtual_parameters?.toLocaleString() ?? '—'}
-              </span>
-            </div>
-
-            {/* Wave basis KB line */}
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', opacity: 0.5, textAlign: 'right' }}>
-              {waveBasisKb} KB stored
-            </div>
-
-            {/* Visual Gauge Bar */}
-            <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
-              <div 
-                style={{ 
-                  height: '100%', 
-                  width: `${paramProgress}%`, 
-                  background: 'linear-gradient(90deg, var(--blue), var(--cyan))',
-                  transition: 'width 1s cubic-bezier(0.16, 1, 0.3, 1)',
-                  boxShadow: '0 0 6px var(--cyan)'
-                }} 
-              />
-            </div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
-              <span>0</span>
-              <span>1.0Q</span>
-            </div>
-          </div>
+          )}
+          {(collapsed && window.innerWidth >= 768) && (
+            <span className="live-pulse-dot" title="OPERATIONAL" />
+          )}
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   )
 }

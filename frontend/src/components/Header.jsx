@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 export default function Header({ title, subtitle }) {
   const [time, setTime] = useState('')
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date()
-      setTime(now.toLocaleTimeString() + ' | ' + now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))
+      setTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' | ' + now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))
     }
     updateTime()
     const interval = setInterval(updateTime, 1000)
@@ -14,38 +18,37 @@ export default function Header({ title, subtitle }) {
   }, [])
 
   return (
-    <div className="header">
-      <div>
-        <div className="header-title">{title}</div>
-        {subtitle && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>}
+    <header className="app-header">
+      <div className="header-left">
+        <h1 className="header-page-title">{title}</h1>
+        {subtitle && <p className="header-page-sub">{subtitle}</p>}
       </div>
-      
-      <div className="header-badges">
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 16, borderRight: '1px solid var(--border)', paddingRight: 16 }}>
+
+      <div className="header-right">
+        <div className="header-time mono">
           {time}
         </div>
-        
-        <span className="badge badge-cyan" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span className="status-dot" style={{ margin: 0, width: 6, height: 6 }} />
-          LIVE TELEMETRY
-        </span>
-        
-        <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span>∿</span> AXIOM-Φ ACTIVE
-        </span>
-        
-        <span 
-          className="badge mono" 
-          style={{ 
-            background: 'rgba(131, 56, 236, 0.12)', 
-            color: '#b388ff', 
-            border: '1px solid rgba(131, 56, 236, 0.25)',
-            textShadow: '0 0 10px rgba(131, 56, 236, 0.3)'
-          }}
-        >
-          KRONOS v1.0
-        </span>
+
+        <div className="header-pill telemetry-live">
+          <span className="live-pulse-dot" />
+          <span>CYBER TELEMETRY LIVE</span>
+        </div>
+
+        <div className="header-pill styx-active">
+          <span>🛡️ STYX PRIME</span>
+        </div>
+
+        {user && (
+          <div className="header-user-badge">
+            <span className="user-role-chip">
+              👤 {user.username} <b style={{ color: '#ff2a20' }}>({user.role})</b>
+            </span>
+            <button className="logout-btn" onClick={() => { logout(); navigate('/login') }}>
+              Logout
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </header>
   )
 }

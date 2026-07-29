@@ -9,6 +9,8 @@
 backend/.env
 .env.local
 .env.*.local
+backend/credentials/
+credentials/
 
 # ── Python bytecode & caches ────────────────────────────────
 __pycache__/
@@ -28,10 +30,11 @@ env/
 dist/
 build/
 
-# ── Databases ───────────────────────────────────────────────
+# ── Databases & Archives ─────────────────────────────────────
 *.db
 *.sqlite3
 backend/sera_db.sqlite3
+*.zip
 
 # ── Machine-learning model weights (often too large for git) ─
 *.pt

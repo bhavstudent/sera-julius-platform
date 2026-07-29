@@ -1,55 +1,71 @@
 import { useEffect, useState } from 'react'
-import { fetchEntropy, fetchAlerts } from '../api/client'
+import { fetchAxiomMonitor } from '../api/client'
 import GlassCard from '../components/GlassCard'
 import AnimatedCounter from '../components/AnimatedCounter'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import NewsPanel from '../components/NewsPanel'
 
 export default function AxiomMonitor() {
+  const [monitorData, setMonitorData] = useState({ total_entities: 0, active_alerts: 0 })
   const [entropy, setEntropy] = useState([])
   const [alerts, setAlerts] = useState([])
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set())
   const [selectedEntity, setSelectedEntity] = useState(null)
 
-  useEffect(() => {
-    fetchEntropy().then(data => {
-      setEntropy(data)
-      setSelectedEntity(prev => prev || (data.length > 0 ? data[0] : null))
-    })
-    fetchAlerts().then(setAlerts)
-
-    const i = setInterval(() => {
-      fetchEntropy().then(data => {
-        setEntropy(data)
+  const updateMonitor = () => {
+    fetchAxiomMonitor().then(data => {
+      if (data) {
+        setMonitorData(data)
+        setEntropy(data.entropy_summary || [])
+        
+        const formattedAlerts = (data.high_risk_entities || []).map(item => ({
+          entity_id: item.entity_id,
+          entity_name: item.entity_name || 'Unknown Entity',
+          severity: (item.entropy || 0) > 2.0 ? 'CRITICAL SIREN' : 'PRE-TRANSITION',
+          entropy_value: item.entropy,
+          z_score: item.z_score || 2.1,
+          domain: item.domain || 'technology',
+          timestamp: item.timestamp || new Date().toLocaleTimeString() + ' UTC',
+          description: `Shannon entropy turbulence spike detected (${item.domain || 'technology'}) — Z-score +${item.z_score || 2.1}σ`
+        }))
+        
+        setAlerts(formattedAlerts)
+        
         setSelectedEntity(prev => {
-          if (!prev) return data.length > 0 ? data[0] : null
-          const updated = data.find(item => item.entity_name === prev.entity_name)
+          if (!prev) return data.entropy_summary?.length > 0 ? data.entropy_summary[0] : null
+          const updated = data.entropy_summary.find(item => item.entity_name === prev.entity_name)
           return updated || prev
         })
-      })
-      fetchAlerts().then(setAlerts)
-    }, 4000)
+      }
+    })
+  }
+
+  useEffect(() => {
+    updateMonitor()
+    const i = setInterval(updateMonitor, 2000)
     return () => clearInterval(i)
   }, [])
 
-  useEffect(() => {
-    if (selectedEntity) {
-      console.log(`Targeting node entropy signature for: ${selectedEntity.entity_name}`)
-    }
-  }, [selectedEntity])
+  const handleDismissAlert = (entity_name) => {
+    setDismissedAlerts(prev => new Set(prev).add(entity_name))
+  }
+
+  const handleInspectAlert = (entity_name) => {
+    const found = entropy.find(e => e.entity_name === entity_name)
+    if (found) setSelectedEntity(found)
+  }
+
+  const activeAlertsList = alerts.filter(a => !dismissedAlerts.has(a.entity_name))
 
   // Get color for entropy score
   const getEntropyColor = (val) => {
-    if (val > 2.2) return 'var(--red)'
-    if (val > 1.4) return 'var(--amber)'
-    return 'var(--cyan)'
+    if (val > 2.2) return '#ff2a20'
+    if (val > 1.4) return '#ff5e3a'
+    return '#ffb340'
   }
 
   // Get glow style based on status
-  const getStatusGlow = (status) => {
-    if (status === 'critical') return 'red'
-    if (status === 'pre-transition') return 'amber'
-    return 'cyan'
-  }
+  const getStatusGlow = () => 'red'
 
   // Prep data for Recharts (Top 8 highest entropy)
   const chartData = [...entropy]
@@ -66,52 +82,109 @@ export default function AxiomMonitor() {
     <div style={{ animation: 'fadeUp 0.4s ease', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'stretch' }} className="axiom-monitor">
       <div style={{ flex: '3 1 350px', minWidth: '350px' }}>
       <div className="grid-2" style={{ marginBottom: 24 }}>
-        <GlassCard glowType={alerts.length > 0 ? 'red' : ''}>
+        <GlassCard glowType={activeAlertsList.length > 0 ? 'red' : ''}>
           <div className="stat-label">Active Pre-Transition Alerts</div>
-          <div className="stat-value mono" style={{ color: alerts.length > 0 ? 'var(--red)' : 'var(--text-primary)' }}>
-            <AnimatedCounter value={alerts.length} />
+          <div className="stat-value mono" style={{ color: activeAlertsList.length > 0 ? 'var(--red)' : 'var(--text-primary)' }}>
+            <AnimatedCounter value={activeAlertsList.length} />
           </div>
-          <div className="stat-sub">Spike detections (z-score &gt; 2.0)</div>
+          <div className="stat-sub" style={{ color: '#ff5e3a' }}>● Live Shannon Z-score spike sirens (&gt; +1.6σ)</div>
         </GlassCard>
         <GlassCard glowType="cyan">
           <div className="stat-label">Entities Monitored</div>
-          <div className="stat-value mono">
-            <AnimatedCounter value={entropy.length} />
+          <div className="stat-value mono" style={{ color: '#00f5d4' }}>
+            <AnimatedCounter value={monitorData.total_entities || entropy.length} />
           </div>
-          <div className="stat-sub">AXIOM-Φ state trackers active</div>
+          <div className="stat-sub" style={{ color: '#22c55e' }}>↑ AI autonomously discovering new entities</div>
         </GlassCard>
       </div>
 
       {/* Alerts Area */}
-      {alerts.length > 0 && (
+      {activeAlertsList.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <GlassCard title="⚠ CRITICAL PRE-TRANSITION SIRENS" glowType="red">
+          <GlassCard title={`🚨 CRITICAL PRE-TRANSITION SIRENS (${activeAlertsList.length} ACTIVE)`} glowType="red">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {alerts.map((a, idx) => (
+              {activeAlertsList.map((a, idx) => (
                 <div 
-                  key={idx} 
+                  key={`${a.entity_name}-${idx}`} 
                   style={{ 
                     padding: '14px 18px', 
-                    background: 'rgba(255, 0, 60, 0.04)', 
-                    border: '1px solid rgba(255, 0, 60, 0.15)', 
-                    borderRadius: 8,
+                    background: a.severity.includes('CRITICAL') ? 'rgba(255, 42, 32, 0.08)' : 'rgba(255, 94, 58, 0.06)', 
+                    border: `1px solid ${a.severity.includes('CRITICAL') ? 'rgba(255, 42, 32, 0.45)' : 'rgba(255, 94, 58, 0.3)'}`, 
+                    borderRadius: 10,
                     display: 'flex',
                     flexWrap: 'wrap',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: 12
+                    gap: 12,
+                    boxShadow: '0 0 15px rgba(255, 42, 32, 0.15)',
+                    animation: 'fadeInSlide 0.3s ease'
                   }}
-                  className="mono animate-pulse-glow"
+                  className="mono"
                 >
-                  <div>
-                    <span style={{ fontWeight: 800, color: 'var(--red)', fontSize: 14 }}>{a.entity_name}</span>
-                    <span className="badge badge-red" style={{ marginLeft: 12 }}>{a.severity}</span>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>{a.description}</div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>🚨</span>
+                      <span style={{ fontWeight: 900, color: '#ffffff', fontSize: 15 }}>{a.entity_name}</span>
+                      <span style={{
+                        background: 'rgba(255,42,32,0.3)',
+                        color: '#ff2a20',
+                        border: '1px solid rgba(255,42,32,0.6)',
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: 9,
+                        fontWeight: 800
+                      }}>
+                        {a.severity}
+                      </span>
+                      <span style={{ fontSize: 10, color: '#ff5e3a', background: 'rgba(255,94,58,0.15)', padding: '2px 6px', borderRadius: 4 }}>
+                        +{a.z_score}σ
+                      </span>
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 6, display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <span>{a.description}</span>
+                      <span style={{ fontSize: 10, color: '#64748b', marginLeft: 'auto' }}>{a.timestamp}</span>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SHANNON ENTROPY</div>
-                    <div style={{ fontSize: 18, fontWeight: 'bold', color: 'var(--red)' }}>
-                      {a.entropy_value?.toFixed(4)}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 9, color: '#94a3b8' }}>SHANNON ENTROPY</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: getEntropyColor(a.entropy_value) }}>
+                        {a.entropy_value?.toFixed(4)}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => handleInspectAlert(a.entity_name)}
+                        style={{
+                          background: 'rgba(255,42,32,0.2)',
+                          border: '1px solid rgba(255,42,32,0.5)',
+                          color: '#ff2a20',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🎯 INSPECT
+                      </button>
+                      <button
+                        onClick={() => handleDismissAlert(a.entity_name)}
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: '#94a3b8',
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          fontSize: 10,
+                          cursor: 'pointer'
+                        }}
+                        title="Acknowledge & Mute Siren"
+                      >
+                        ✕ ACK
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -125,10 +198,10 @@ export default function AxiomMonitor() {
         {/* Left Column: Top entropy chart & Detailed inspector */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Recharts Bar Comparison */}
-          <GlassCard title="Entropy Variance - High-Risk Entities" glowType="cyan">
-            <div style={{ height: 200, marginTop: 10 }}>
+          <GlassCard title="Entropy Variance - High-Risk Entities" glowType="red">
+            <div style={{ minHeight: '300px', minWidth: '300px', display: 'flex', flexDirection: 'column', marginTop: 10 }}>
               {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={9} tickLine={false} />
                     <YAxis stroke="var(--text-muted)" fontSize={9} tickLine={false} />
@@ -162,18 +235,23 @@ export default function AxiomMonitor() {
 
           {/* Inspector Panel */}
           {selectedEntity && (
-            <GlassCard title="Entity Entropy Inspector" glowType={getStatusGlow(selectedEntity.status)}>
+            <GlassCard title="Entity Entropy Inspector (Real-Time Live Drift)" glowType={getStatusGlow(selectedEntity.status)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h4 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedEntity.entity_name}</h4>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                     Registry Reference Status: <span style={{ color: getEntropyColor(selectedEntity.entropy), fontWeight: 'bold', textTransform: 'capitalize' }}>{selectedEntity.status}</span>
                   </div>
+                  {selectedEntity.z_score !== undefined && (
+                    <div style={{ fontSize: 11, color: '#ff5e3a', marginTop: 4 }} className="mono">
+                      Z-Score Anomaly: <b>{selectedEntity.z_score > 0 ? `+${selectedEntity.z_score}` : selectedEntity.z_score} σ</b> | Baseline: {selectedEntity.baseline || 0.55}
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>CURRENT SHANNON INDEX</div>
                   <div className="mono" style={{ fontSize: 26, fontWeight: 800, color: getEntropyColor(selectedEntity.entropy) }}>
-                    {selectedEntity.entropy?.toFixed(5)}
+                    {selectedEntity.entropy?.toFixed(4)}
                   </div>
                 </div>
               </div>

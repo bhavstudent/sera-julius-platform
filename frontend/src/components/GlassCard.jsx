@@ -1,7 +1,7 @@
 export default function GlassCard({ 
   children, 
   title, 
-  glowType = '', // 'cyan', 'blue', 'red', or ''
+  glowType = '',
   className = '', 
   style = {},
   onClick
@@ -11,16 +11,19 @@ export default function GlassCard({
 
   return (
     <div 
-      className={`card ${glowClass} ${className}`} 
+      className={`card glass-panel cyber-hud-card ${glowClass} ${className}`} 
       style={{ ...style, ...cursorStyle }}
       onClick={onClick}
     >
+      <span className="hud-corner top-left" />
+      <span className="hud-corner top-right" />
+      <span className="hud-corner bottom-left" />
+      <span className="hud-corner bottom-right" />
+      <div className="cyber-scanline" />
+
       {title && (
         <div className="card-title">
-          {glowType === 'red' && <span style={{ color: 'var(--red)' }}>●</span>}
-          {glowType === 'cyan' && <span style={{ color: 'var(--cyan)' }}>●</span>}
-          {glowType === 'blue' && <span style={{ color: 'var(--blue)' }}>●</span>}
-          {title}
+          <span>{title}</span>
         </div>
       )}
       {children}

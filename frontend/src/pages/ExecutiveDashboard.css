@@ -1,0 +1,22 @@
+.table-container {
+    background: rgba(4, 5, 10, 0.95);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 42, 32, 0.35);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    max-height: calc(100vh - 300px); /* Leave room for header + stats */
+    overflow: auto;
+    position: relative;
+}
+
+.table-container h3 {
+    margin-top: 0;
+    color: #ffffff;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    background: rgba(4, 5, 10, 0.98);
+    padding: 10px 0;
+    z-index: 2;
+    border-bottom: 1px solid rgba(255, 42, 32, 0.25);
+}
