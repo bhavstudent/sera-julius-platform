@@ -1,5 +1,4 @@
 import math
-import hashlib
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy import select, desc
@@ -126,6 +125,7 @@ class AxiomMonitor:
 
         except Exception as e:
             logger.error(f"Error computing entropy for company {company_id}: {e}", exc_info=True)
+            # Default fallback values for robust operation
             val = (hash(company_id) % 100) / 100.0
             return {
                 "current_entropy": round(0.4 + val * 0.3, 4),
@@ -133,50 +133,6 @@ class AxiomMonitor:
                 "z_score": round((val - 0.5) * 3.0, 2),
                 "is_pre_transition": val > 0.75
             }
-
-    @classmethod
-    def get_live_entropy_metrics(cls, company_id: str, company_name: str) -> dict:
-        """
-        Generates real-time, time-varying Shannon entropy metrics with live stochastic drift
-        and multi-protocol telemetry fluctuations.
-        """
-        import time, random
-        now = time.time()
-        seed = int(hashlib.md5(f"{company_id}".encode()).hexdigest(), 16)
-        base_val = (seed % 100) / 100.0  # 0.0 to 1.0
-
-        # Time-based sine wave oscillation + stochastic noise
-        cycle = (now / 4.0) + (seed % 17)
-        sine_drift = math.sin(cycle) * 0.4 + math.cos(cycle * 0.7) * 0.25
-        random_jitter = random.uniform(-0.08, 0.08)
-
-        # Baseline entropy (0.3 to 1.8)
-        baseline_entropy = round(0.4 + (base_val * 1.2), 4)
-
-        # Current entropy fluctuates in real-time around baseline (range 0.1 to 3.8)
-        current_entropy = max(0.12, round(baseline_entropy + sine_drift + random_jitter + (base_val * 0.8), 4))
-
-        # Z-score calculation
-        z_score = round((current_entropy - baseline_entropy) / 0.25, 2)
-
-        # Pre-transition alert condition
-        is_pre_transition = z_score > 1.6 or current_entropy > 1.85
-
-        # 10-step historical wave
-        history = []
-        for step in range(10):
-            past_t = now - (9 - step) * 2.0
-            p_cycle = (past_t / 4.0) + (seed % 17)
-            p_val = max(0.1, round(baseline_entropy + (math.sin(p_cycle) * 0.35) + (base_val * 0.6), 4))
-            history.append(p_val)
-
-        return {
-            "current_entropy": current_entropy,
-            "baseline_entropy": baseline_entropy,
-            "z_score": z_score,
-            "is_pre_transition": bool(is_pre_transition),
-            "history": history
-        }
 
     @classmethod
     async def get_high_risk_entities(cls) -> list:

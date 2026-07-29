@@ -1,7 +1,3 @@
-try:
-    from services.redis_cache import get_cache, set_cache
-except ImportError:
-    from redis_cache import get_cache, set_cache
 
 _INTEL_MEM_CACHE = {}
 """
@@ -448,11 +444,6 @@ async def aggregate_company_intel(
 ) -> dict:
     import time
     now = time.time()
-    cache_key = f"intel:{ticker.upper()}"
-    redis_data = await get_cache(cache_key)
-    if redis_data:
-        return redis_data
-
     cached = _INTEL_MEM_CACHE.get(ticker.upper())
     if cached and (now - cached[0] < 300):
         return cached[1]
@@ -529,5 +520,4 @@ async def aggregate_company_intel(
         "country_meta": country,
     }
     _INTEL_MEM_CACHE[ticker.upper()] = (now, result)
-    await set_cache(f"intel:{ticker.upper()}", result, ttl_seconds=300)
     return result

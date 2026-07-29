@@ -1,4 +1,3 @@
-from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from database import async_session_maker
@@ -10,91 +9,66 @@ router = APIRouter(prefix="/api/axiom", tags=["axiom"])
 @router.get("/monitor")
 async def get_axiom_monitor():
     try:
-        from services.live_engine import get_live_state
-        live_state = get_live_state()
-
         async with async_session_maker() as session:
-            # Count total companies in DB
+            # Count total companies first (very fast)
             from sqlalchemy import func
             total_res = await session.execute(select(func.count(CompanyModel.id)))
-            db_entities = total_res.scalar() or 0
+            total_entities = total_res.scalar() or 0
             
-            # Fetch companies for detailed display
+            # Fetch only the first 50 companies for detailed display
             comp_res = await session.execute(select(CompanyModel).limit(50))
             companies = comp_res.scalars().all()
-
-        # Real-time dynamic entity count (grows as AI discovers new entities)
-        total_entities = max(db_entities, live_state.get("total_entities", 59))
 
         entropy_summary = []
         active_alerts = 0
 
-        # Build detailed entropy summary with fallback when database is empty
-        display_companies = companies if companies else [
-            type("Company", (), {"id": f"comp_{i}", "legal_name": name})()
-            for i, name in enumerate([
-                "CrowdStrike Cyber Ltd", "NVIDIA AI Infrastructure", "Palantir Defense", 
-                "SentinelOne Systems", "Palo Alto Networks", "Cloudflare Global Net"
-            ])
-        ]
-
-        for company in display_companies:
-            metrics = AxiomMonitor.get_live_entropy_metrics(company.id, company.legal_name)
+        # Build detailed entropy summary for the 50 companies
+        for company in companies:
+            metrics = await AxiomMonitor.compute_entropy(company.id)
             is_pre = metrics["is_pre_transition"]
             
             if is_pre:
                 active_alerts += 1
 
             status = "pre-transition" if is_pre else "stable"
-            sector = getattr(company, "sector", None) or "Technology"
+            
+            # Generate history for display
+            history = []
+            base = metrics["baseline_entropy"]
+            curr = metrics["current_entropy"]
+            for i in range(10):
+                step = base + (curr - base) * (i / 9.0)
+                history.append(round(step, 4))
 
             entropy_summary.append({
                 "entity_id": company.id,
                 "entity_name": company.legal_name,
-                "domain": sector,
+                "domain": company.sector or "technology",
                 "entropy": metrics["current_entropy"],
-                "baseline": metrics["baseline_entropy"],
                 "z_score": metrics["z_score"],
                 "status": status,
-                "history": metrics.get("history", [])
+                "history": history
             })
 
-        # Extract high risk entities with rich live siren telemetry
+        # Extract high risk entities from the active monitor slice for speed
         high_risk_entities = [
             {
                 "entity_id": item["entity_id"],
                 "entity_name": item["entity_name"],
                 "risk_factor": "entropy_spike",
-                "entropy": item["entropy"],
-                "z_score": item["z_score"],
-                "domain": item["domain"],
-                "timestamp": datetime.utcnow().strftime("%H:%M:%S") + " UTC"
+                "entropy": item["entropy"]
             }
-            for item in entropy_summary if item["status"] == "pre-transition" or item["entropy"] > 1.8
+            for item in entropy_summary if item["status"] == "pre-transition" or item["entropy"] > 0.6
         ]
 
         return {
             "total_entities": total_entities,
-            "active_alerts": len(high_risk_entities),
+            "active_alerts": active_alerts,
             "high_risk_entities": high_risk_entities,
-            "entropy_summary": entropy_summary,
-            "ai_engine_status": "ONLINE_ACTIVE_SCANNING"
+            "entropy_summary": entropy_summary
         }
     except Exception as e:
-        return {
-            "total_entities": 59,
-            "active_alerts": 2,
-            "high_risk_entities": [
-                {"entity_id": "comp_0", "entity_name": "CrowdStrike Cyber Ltd", "domain": "Cybersecurity", "entropy_value": 2.45, "description": "High-risk entropy drift detected", "timestamp": "12:00:00 UTC"},
-                {"entity_id": "comp_1", "entity_name": "Palantir Defense", "domain": "Defense Intelligence", "entropy_value": 2.12, "description": "Phase transition anomaly", "timestamp": "12:00:00 UTC"}
-            ],
-            "entropy_summary": [
-                {"entity_id": "comp_0", "entity_name": "CrowdStrike Cyber Ltd", "entropy": 2.45, "domain": "Cybersecurity", "status": "pre-transition"},
-                {"entity_id": "comp_1", "entity_name": "Palantir Defense", "entropy": 2.12, "domain": "Defense Intelligence", "status": "pre-transition"},
-                {"entity_id": "comp_2", "entity_name": "NVIDIA AI Infrastructure", "entropy": 1.15, "domain": "Semiconductors", "status": "stable"}
-            ],
-            "ai_engine_status": "ONLINE_ACTIVE_SCANNING"
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/entropy")
 async def get_entropy_data():
