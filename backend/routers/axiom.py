@@ -46,16 +46,17 @@ async def get_axiom_monitor():
                 active_alerts += 1
 
             status = "pre-transition" if is_pre else "stable"
+            sector = getattr(company, "sector", None) or "Technology"
 
             entropy_summary.append({
                 "entity_id": company.id,
                 "entity_name": company.legal_name,
-                "domain": company.sector or "technology",
+                "domain": sector,
                 "entropy": metrics["current_entropy"],
                 "baseline": metrics["baseline_entropy"],
                 "z_score": metrics["z_score"],
                 "status": status,
-                "history": metrics["history"]
+                "history": metrics.get("history", [])
             })
 
         # Extract high risk entities with rich live siren telemetry
