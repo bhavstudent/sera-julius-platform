@@ -12,13 +12,14 @@ patch_payload = {
     "serviceDetails": {
         "envSpecificDetails": {
             "buildCommand": "pip install -r requirements.txt",
-            "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+            "startCommand": 'sh -c "uvicorn main:app --host 0.0.0.0 --port $PORT"'
         }
     }
 }
 
 r = requests.patch("https://api.render.com/v1/services/srv-d9kotttbedkc73b632ig", json=patch_payload, headers=headers)
 print("PATCH STATUS:", r.status_code)
+print("PATCH RESP:", r.json())
 
 d = requests.post("https://api.render.com/v1/services/srv-d9kotttbedkc73b632ig/deploys", headers=headers)
 print("NEW DEPLOY ID:", d.json().get("id"))
