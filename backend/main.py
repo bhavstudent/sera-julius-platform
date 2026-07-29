@@ -134,8 +134,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             request.state.client_id = API_KEYS[api_key]
             return await call_next(request)
 
-        # Always allow auth endpoints (login/me) & health check through
-        if request.url.path.startswith("/api/auth"):
+        # Always allow auth endpoints, health checks, & API docs through without API key checks
+        if request.url.path in ("/", "/health", "/docs", "/openapi.json") or request.url.path.startswith("/api/auth") or request.url.path.startswith("/api/health"):
             return await call_next(request)
 
         # Standard HTTP routes: accept key from header or query param.
