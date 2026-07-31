@@ -51,7 +51,7 @@ class AppSettings(BaseModel):
     # Server settings
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=8000, ge=1, le=65535)
-    CORS_ORIGINS: List[str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
+    CORS_ORIGINS: List[str] = Field(default=["*"])
 
     # API credentials and sync toggles
     USE_REAL_DATA: bool = Field(default=True)
