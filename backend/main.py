@@ -162,10 +162,18 @@ from starlette.middleware.gzip import GZipMiddleware
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-# Order: Last added runs first. Adding GZipMiddleware first makes it run on the response last.
+# Order: Last added runs first (Starlette LIFO). CORSMiddleware must be added LAST to be outermost.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(SlowAPIMiddleware)
+# CORS must be outermost so ALL responses including OPTIONS preflight get Access-Control headers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(Exception)
 async def global_self_healing_exception_handler(request: Request, exc: Exception):
@@ -179,13 +187,7 @@ async def global_self_healing_exception_handler(request: Request, exc: Exception
         }
     )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORSMiddleware is now added above near SlowAPIMiddleware (outermost position)
 
 @app.get("/")
 @app.get("/health")
