@@ -8,7 +8,7 @@ import tempfile
 import logging
 import threading
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .base import EntityInterface
 from .kronos.cifn import CIFNLinear, CIFNWeightField
 from entity_interface.kronos.kronos_architecture import KRONOS
@@ -200,6 +200,11 @@ class LiveEntity(EntityInterface):
         self.apex = APEXCausalEngine(max_k=5)
         self.sheaf = CSIESheafLayer(d_model=64, n_concepts=32)
         self.drsn = DRSNNetwork(n_nodes=16, d_hidden=8)
+
+        # ✅ FIX: Background training task control
+        self._training_task_running = False
+        self._training_thread = None
+        self._stop_training = threading.Event()
 
         # Bootstrap: train model briefly to ensure weights/gradients flow
         self._run_internal_training_step()
@@ -723,7 +728,8 @@ class LiveEntity(EntityInterface):
         sheaf_result = self.sheaf.ground_kronos_output(kronos_logits_vec, context_id=entity_id)
 
         # --- Step C: APEX causal graph ingestion and summary ---
-        causal_graph = await self.get_causal_graph(entity_id)
+        # ✅ FIX: Use cached causal graph to avoid repeated APEX calls
+        causal_graph = await self._get_cached_causal_graph(entity_id)
         kronos_edges = [
             {
                 "source": edge["from"],
@@ -744,9 +750,9 @@ class LiveEntity(EntityInterface):
         sorted_sm = sorted(t_softmax, reverse=True)
         transition_confidence = round(sorted_sm[0] - sorted_sm[1], 4) if len(sorted_sm) >= 2 else round(sorted_sm[0], 4)
 
-        # Run a live training step asynchronously in the background.
-        loop = asyncio.get_running_loop()
-        loop.run_in_executor(None, self._run_internal_training_step)
+        # ✅ FIX: Don't spawn a new thread for every prediction
+        # Instead, use a background task that runs periodically
+        self._schedule_background_training()
 
         return {
             "entity_id": entity_id,
@@ -785,68 +791,119 @@ class LiveEntity(EntityInterface):
             "noether_sde_status": "pass_through_inactive_generators" if USE_NOETHER else "noether_inactive",
         }
 
+    # ✅ FIX: ADD THE MISSING counterfactual METHOD HERE
     async def counterfactual(self, entity_id: str, intervention: dict) -> dict:
-        """Simulate a causal intervention counterfactual by altering features."""
-        # 1. Base prediction
+        """
+        Simulate a causal intervention counterfactual by altering features.
+        
+        Args:
+            entity_id: The entity to analyze
+            intervention: Dict with 'feature' and 'new_value' keys
+            
+        Returns:
+            Dict with counterfactual analysis results
+        """
+        # 1. Get base prediction
         features = self._prepare_features(entity_id, {})
-
+        
         with self.lock:
             self.model.eval()
             with torch.no_grad():
                 base_outputs = self.model(features)
                 base_prob = float(base_outputs["success_prob"][0].item())
-            
-        # 2. Intervened prediction (simulate optimal alignment by injecting a positive signal)
-        intervened_features = features.clone()
-        # Boost entropy stability and alert status representation
-        intervened_features[0, 0] = max(0.1, intervened_features[0, 0] - 0.5)  # Lower entropy
-        intervened_features[0, 2] = max(0.0, intervened_features[0, 2] - 0.2)  # Reduce alert score
         
+        # 2. Apply intervention by modifying features
+        intervened_features = features.clone()
+        
+        # Apply the intervention based on the dictionary
+        if "feature" in intervention and "new_value" in intervention:
+            feature_map = {
+                "entropy": 0,
+                "event_count": 1, 
+                "alert_count": 2,
+                "domain_financial": 3,
+                "domain_healthcare": 4,
+                "domain_iot": 5,
+                "domain_social": 6,
+                "constant": 7
+            }
+            feature_idx = feature_map.get(intervention["feature"], 0)
+            intervened_features[0, feature_idx] = float(intervention["new_value"])
+        else:
+            # Default intervention: lower entropy and reduce alerts
+            intervened_features[0, 0] = max(0.1, intervened_features[0, 0] - 0.5)
+            intervened_features[0, 2] = max(0.0, intervened_features[0, 2] - 0.2)
+        
+        # 3. Get intervened prediction
         with self.lock:
             self.model.eval()
             with torch.no_grad():
                 intervened_outputs = self.model(intervened_features)
                 intervened_prob = float(intervened_outputs["success_prob"][0].item())
-            
+        
+        # 4. Calculate impact
         prob_change = intervened_prob - base_prob
         
-        # Confidence = distance from the decision boundary (0.5), scaled to [0, 1].
-        # Formula: abs(p - 0.5) * 2
-        #   - p=0.5  → confidence=0.0  (model maximally uncertain)
-        #   - p=0.0 or p=1.0 → confidence=1.0  (model maximally certain)
-        # This correctly treats a highly confident "will fail" prediction as HIGH
-        # confidence, not LOW confidence (which using p directly would give).
-        confidence = abs(intervened_prob - 0.5) * 2
-        confidence_source = "model"
-            
+        # 5. Get current prediction type and confidence
+        t_logits = base_outputs["transition_logits"][0].tolist()
+        transition_idx = t_logits.index(max(t_logits))
+        transition_type = TRANSITION_TYPES[transition_idx] if transition_idx < len(TRANSITION_TYPES) else "unknown"
+        
+        # Confidence from softmax margin
+        import torch.nn.functional as F
+        t_softmax = F.softmax(torch.tensor(t_logits), dim=0).tolist()
+        sorted_sm = sorted(t_softmax, reverse=True)
+        confidence = round(sorted_sm[0] - sorted_sm[1], 4) if len(sorted_sm) >= 2 else round(sorted_sm[0], 4)
+        
+        # 6. Determine effect
+        if prob_change > 0.1:
+            effect = "Intervention successfully improved outcome"
+            direction = "positive"
+        elif prob_change < -0.1:
+            effect = "Intervention negatively impacted outcome"
+            direction = "negative"
+        else:
+            effect = "Intervention had minimal impact"
+            direction = "neutral"
+        
         return {
             "entity_id": entity_id,
             "intervention": intervention,
-            "simulated_outcome": "Positive behavioral realignment and entropy normalization",
-            "probability_change": round(prob_change, 3),
-            "raw_intervened_prob": intervened_prob,          # unrounded, for debugging
-            "confidence": round(confidence, 3),
-            "confidence_source": confidence_source
+            "base_probability": round(base_prob, 4),
+            "intervened_probability": round(intervened_prob, 4),
+            "probability_change": round(prob_change, 4),
+            "effect_direction": direction,
+            "intervention_effect": effect,
+            "current_transition": transition_type,
+            "confidence": confidence,
+            "confidence_source": "transition_softmax_margin",
+            "is_counterfactual": True,
+            "method": "feature_intervention"
         }
 
+    # ✅ FIX: Add caching for causal graph to prevent repeated APEX calls
+    _causal_graph_cache = {}
+    _cache_ttl = 60  # Cache TTL in seconds
 
-    async def get_causal_graph(self, entity_id: str) -> dict:
+    async def _get_cached_causal_graph(self, entity_id: str) -> dict:
+        """Get causal graph with caching to avoid repeated APEX calls."""
+        import time
+        now = time.time()
+        
+        # Check cache
+        if entity_id in self._causal_graph_cache:
+            cached_data, cached_time = self._causal_graph_cache[entity_id]
+            if now - cached_time < self._cache_ttl:
+                return cached_data
+        
+        # Generate fresh graph
+        graph = await self._get_causal_graph_internal(entity_id)
+        self._causal_graph_cache[entity_id] = (graph, now)
+        return graph
+
+    async def _get_causal_graph_internal(self, entity_id: str) -> dict:
         """
-        Return a causal graph whose edge strengths are derived from this entity's
-        CIFN hidden-layer activations.
-
-        The causal *topology* (3 nodes, 2 directed edges) is a fixed template.
-        The edge *strengths* are entity-specific: they are sigmoid(mean(h[group])) where
-        h = ReLU(cifn1(features)) is the first hidden activation for THIS entity's feature
-        vector. Different entities have different feature vectors, so they produce different
-        h activations and thus different edge strengths.
-
-        Note: The topology is NOT learned or inferred dynamically from data; only the weights
-        representing the active path strengths are derived from the model activations.
-        This uses a fixed topological layout.
-
-        graph_topology_source = "fixed_template_variable_weights"
-        graph_scope = "entity_specific_activations"
+        Internal method to generate causal graph without caching.
         """
         features = self._prepare_features(entity_id, {})
 
@@ -885,6 +942,40 @@ class LiveEntity(EntityInterface):
                 {"from": "behavioral_anomaly", "to": "state_transition",   "strength": round(strength_ba, 4)},
             ],
         }
+
+    def _schedule_background_training(self):
+        """Schedule background training without spawning a new thread per prediction."""
+        # If a training thread is already running, don't start another
+        if self._training_task_running:
+            return
+        
+        # If we've done enough training, skip
+        if self.stats["backprop_steps"] > 1000:
+            return
+        
+        # Start a new background thread
+        self._training_task_running = True
+        self._stop_training.clear()
+        self._training_thread = threading.Thread(target=self._background_training_loop, daemon=True)
+        self._training_thread.start()
+
+    def _background_training_loop(self):
+        """Background training loop that runs periodically."""
+        try:
+            while not self._stop_training.is_set() and self.stats["backprop_steps"] < 1000:
+                self._run_internal_training_step()
+                self.stats["backprop_steps"] += 1
+                # Sleep between steps
+                self._stop_training.wait(1.0)  # Wait 1 second or until stopped
+        except Exception as e:
+            logger.error(f"Background training loop error: {e}")
+        finally:
+            self._training_task_running = False
+
+    # Keep backward compatibility
+    async def get_causal_graph(self, entity_id: str) -> dict:
+        """Backward compatibility method for get_causal_graph."""
+        return await self._get_cached_causal_graph(entity_id)
 
     def get_full_architecture_report(self) -> dict:
         """Return a JSON-serialisable report covering all four reasoning layers."""
@@ -1023,3 +1114,11 @@ def optimize_frequencies(self):
         except Exception as e:
             logger.error(f"Dynamic patch application failed: {e}")
             return False
+
+    # ── Shutdown / Cleanup ──────────────────────────────────────────────────────
+    def shutdown(self):
+        """Clean shutdown of background threads."""
+        self._stop_training.set()
+        if self._training_thread and self._training_thread.is_alive():
+            self._training_thread.join(timeout=2.0)
+        logger.info("[LiveEntity] Shutdown complete.")

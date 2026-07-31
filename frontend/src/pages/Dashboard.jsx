@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { fetchStats, fetchFreshness } from '../api/client'
 import { createStream } from '../api/websocket'
 import AnimatedCounter from '../components/AnimatedCounter'
@@ -165,43 +165,75 @@ export default function Dashboard() {
   const wsRef = useRef(null)
   const { addToast } = useToast()
   const initialized = useRef(false)
+  
+  // ✅ FIX: Use ref to track if stats fetch is in progress
+  const statsFetching = useRef(false)
+
+  // ✅ FIX: Memoize the toast function to prevent re-creation
+  const showToast = useCallback((message, type) => {
+    addToast(message, type)
+  }, [addToast])
 
   // ─── Backend stats polling ──────────────────────────────────────────────
   useEffect(() => {
-    fetchStats().then(data => {
-      if (data) {
-        setStats(data)
-        // Seed live state from backend on first load
-        if (!initialized.current) {
-          setLiveEntities(data.total_entities || 59)
-          setLiveAlerts(data.active_alerts > 0 ? data.active_alerts : Math.floor(Math.random() * 5) + 3)
-          setLiveEPS(data.events_per_second > 0 ? data.events_per_second : parseFloat((Math.random() * 4 + 1).toFixed(2)))
-          setEventsProcessed(data.events_processed || 0)
-          initialized.current = true
+    // ✅ FIX: Prevent duplicate fetches
+    if (statsFetching.current) return
+    statsFetching.current = true
+
+    const loadInitialData = async () => {
+      try {
+        const data = await fetchStats()
+        if (data) {
+          setStats(data)
+          if (!initialized.current) {
+            setLiveEntities(data.total_entities || 59)
+            setLiveAlerts(data.active_alerts > 0 ? data.active_alerts : Math.floor(Math.random() * 5) + 3)
+            setLiveEPS(data.events_per_second > 0 ? data.events_per_second : parseFloat((Math.random() * 4 + 1).toFixed(2)))
+            setEventsProcessed(data.events_processed || 0)
+            initialized.current = true
+          }
+          prevAlertsRef.current = data.active_alerts ?? 0
         }
-        prevAlertsRef.current = data.active_alerts ?? 0
+      } catch (e) {
+        // Silently fail
       }
-    }).catch(() => {})
 
-    fetchFreshness().then(data => {
-      if (data) setFreshness(data)
-    }).catch(() => {})
+      try {
+        const freshData = await fetchFreshness()
+        if (freshData) setFreshness(freshData)
+      } catch (e) {
+        // Silently fail
+      }
+      
+      statsFetching.current = false
+    }
 
+    loadInitialData()
+
+    // ✅ FIX: Polling interval with proper cleanup
     const interval = setInterval(() => {
+      if (statsFetching.current) return // Skip if already fetching
+      
+      statsFetching.current = true
       fetchStats().then(data => {
         if (data) {
           setStats(data)
-          // Sync live state with backend truth
           if (data.total_entities > 0) setLiveEntities(data.total_entities)
           if (data.active_alerts > 0) setLiveAlerts(data.active_alerts)
           if (data.events_per_second > 0) setLiveEPS(data.events_per_second)
           if (data.events_processed > 0) setEventsProcessed(data.events_processed)
-          if (data.active_alerts > prevAlertsRef.current) {
-            addToast(`AXIOM-Φ: ${data.active_alerts - prevAlertsRef.current} new pre-transition alerts!`, 'critical')
+          
+          // ✅ FIX: Only show toast if alerts increased and we have a previous value
+          if (data.active_alerts > prevAlertsRef.current && prevAlertsRef.current > 0) {
+            showToast(`AXIOM-Φ: ${data.active_alerts - prevAlertsRef.current} new pre-transition alerts!`, 'critical')
           }
           prevAlertsRef.current = data.active_alerts ?? 0
         }
-      }).catch(() => {})
+        statsFetching.current = false
+      }).catch(() => {
+        statsFetching.current = false
+      })
+      
       fetchFreshness().then(data => {
         if (data) setFreshness(data)
       }).catch(() => {})
@@ -218,7 +250,8 @@ export default function Dashboard() {
       clearInterval(interval)
       if (wsRef.current) wsRef.current.close()
     }
-  }, [addToast])
+  // ✅ FIX: Remove addToast from dependencies
+  }, [showToast])
 
   // ─── Client-Side Live Ticker (always alive regardless of backend) ───────
   useEffect(() => {

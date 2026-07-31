@@ -42,13 +42,13 @@ class AppSettings(BaseModel):
     ENTROPY_WINDOW_SIZE: int = Field(default=50, gt=0)
     ENTROPY_ALERT_THRESHOLD: float = Field(default=2.0, gt=0.0)
 
-        # Redis settings
+    # Redis settings
     REDIS_HOST: str = Field(default="localhost")
     REDIS_PORT: int = Field(default=6379)
     REDIS_PASSWORD: str = Field(default="")
     REDIS_DB: int = Field(default=0)
 
-# Server settings
+    # Server settings
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=8000, ge=1, le=65535)
     CORS_ORIGINS: List[str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
@@ -94,8 +94,18 @@ class AppSettings(BaseModel):
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        if not v.startswith(("postgresql+asyncpg://", "sqlite+aiosqlite://", "postgresql://")):
-            raise ValueError("DATABASE_URL must start with a valid postgresql or sqlite protocol driver prefix.")
+        # ✅ FIX: Added "sqlite://" to allowed prefixes
+        allowed_prefixes = (
+            "postgresql+asyncpg://",
+            "sqlite+aiosqlite://",
+            "sqlite://",  # ✅ Added this
+            "postgresql://"
+        )
+        if not any(v.startswith(prefix) for prefix in allowed_prefixes):
+            raise ValueError(
+                f"DATABASE_URL must start with one of: {', '.join(allowed_prefixes)}. "
+                f"Got: {v}"
+            )
         return v
 
     @field_validator("CORS_ORIGINS", mode="before")
@@ -119,7 +129,8 @@ def _load_settings() -> AppSettings:
     try:
         settings = AppSettings(
             PRODUCTION=get_bool("PRODUCTION", False) or (os.getenv("ENTITY_MODE", "mock").lower() != "mock"),
-            DATABASE_URL=os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost:5432/sera_db"),
+            # ✅ FIX: Use SQLite URL from .env or fallback to default
+            DATABASE_URL=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./sera_db.sqlite3"),
             ENTITY_MODE=os.getenv("ENTITY_MODE", "mock"),
             USE_NOETHER=get_bool("USE_NOETHER", False),
             USE_PRETRAINED_CIFN=get_bool("USE_PRETRAINED_CIFN", True),
@@ -133,7 +144,7 @@ def _load_settings() -> AppSettings:
             SOCIAL_EVENTS_PER_SEC=float(os.getenv("SOCIAL_EVENTS_PER_SEC", "2.5")),
             ENTROPY_WINDOW_SIZE=int(os.getenv("ENTROPY_WINDOW_SIZE", "50")),
             ENTROPY_ALERT_THRESHOLD=float(os.getenv("ENTROPY_ALERT_THRESHOLD", "2.0")),
-                        REDIS_HOST=os.getenv("REDIS_HOST", "localhost"),
+            REDIS_HOST=os.getenv("REDIS_HOST", "localhost"),
             REDIS_PORT=int(os.getenv("REDIS_PORT", "6379")),
             REDIS_PASSWORD=os.getenv("REDIS_PASSWORD", ""),
             REDIS_DB=int(os.getenv("REDIS_DB", "0")),

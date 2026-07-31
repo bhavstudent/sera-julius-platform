@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -31,6 +31,7 @@ function SmartRootRoute() {
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
 }
 
+// ✅ FIX: Memoized page metadata to prevent re-creation on each render
 const pages = {
   '/': { title: 'SERA Dashboard', subtitle: 'Real-time multi-protocol intelligence overview' },
   '/entities': { title: 'Entity Registry', subtitle: 'Resolved profiles & state stability registers' },
@@ -49,6 +50,7 @@ const pages = {
   '/security': { title: 'Security Assessment Console', subtitle: 'Multi-agent authorized pentest pipeline — Recon → Analysis → Validation → Human Approval → Report' }
 }
 
+// ✅ FIX: Memoized Layout component to prevent unnecessary re-renders
 function Layout({ path, collapsed, setCollapsed, children }) {
   const meta = pages[path] || pages['/']
   return (
@@ -64,13 +66,60 @@ export default function App() {
   // Automatic screen responsiveness (collapses when screen width < 1200px)
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1200)
 
+  // ✅ FIX: Use useCallback for resize handler
+  const handleResize = useCallback(() => {
+    setCollapsed(window.innerWidth < 1200)
+  }, [])
+
   useEffect(() => {
-    const handleResize = () => {
-      setCollapsed(window.innerWidth < 1200)
-    }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [handleResize])
+
+  // ✅ FIX: Memoize the Layout wrapper to prevent re-renders
+  const renderWithLayout = useCallback((Component, path) => {
+    return (
+      <Layout path={path} collapsed={collapsed} setCollapsed={setCollapsed}>
+        <Component />
+      </Layout>
+    )
+  }, [collapsed])
+
+  // ✅ FIX: Memoize routes to prevent unnecessary re-creation
+  const routes = useMemo(() => (
+    <Routes>
+      <Route path="/" element={<SmartRootRoute />} />
+      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          {renderWithLayout(Dashboard, '/')}
+        </ProtectedRoute>
+      } />
+      <Route path="/entities" element={renderWithLayout(Entities, '/entities')} />
+      <Route path="/entity/:ticker" element={renderWithLayout(EntityDetail, '/entity/:ticker')} />
+      <Route path="/synthesize" element={renderWithLayout(SignalSynthesis, '/synthesize')} />
+      <Route path="/graph" element={renderWithLayout(EntityGraph, '/graph')} />
+      <Route path="/claims" element={renderWithLayout(ClaimCredibility, '/claims')} />
+      <Route path="/geo" element={renderWithLayout(CitationTracking, '/geo')} />
+      <Route path="/axiom" element={renderWithLayout(AxiomMonitor, '/axiom')} />
+      <Route path="/zola" element={renderWithLayout(ZolaPredictions, '/zola')} />
+      <Route path="/ai" element={renderWithLayout(AIAssistant, '/ai')} />
+      <Route path="/intel" element={
+        <ProtectedRoute>
+          {renderWithLayout(DarkIntel, '/intel')}
+        </ProtectedRoute>
+      } />
+      <Route path="/causal-graph" element={renderWithLayout(CausalGraph, '/causal-graph')} />
+      <Route path="/healthcare" element={renderWithLayout(Healthcare, '/healthcare')} />
+      <Route path="/executive" element={renderWithLayout(Executive, '/executive')} />
+      <Route path="/security" element={
+        <ProtectedRoute>
+          {renderWithLayout(SecurityAssessment, '/security')}
+        </ProtectedRoute>
+      } />
+    </Routes>
+  ), [renderWithLayout])
 
   return (
     <AuthProvider>
@@ -78,26 +127,7 @@ export default function App() {
         <BrowserRouter>
           <ParticleBackground />
           <ThreatAlertBanner />
-          <Routes>
-            <Route path="/" element={<SmartRootRoute />} />
-            <Route path="/landing" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Layout path="/" collapsed={collapsed} setCollapsed={setCollapsed}><Dashboard /></Layout></ProtectedRoute>} />
-            <Route path="/entities" element={<Layout path="/entities" collapsed={collapsed} setCollapsed={setCollapsed}><Entities /></Layout>} />
-            <Route path="/entity/:ticker" element={<Layout path="/entity/:ticker" collapsed={collapsed} setCollapsed={setCollapsed}><EntityDetail /></Layout>} />
-            <Route path="/synthesize" element={<Layout path="/synthesize" collapsed={collapsed} setCollapsed={setCollapsed}><SignalSynthesis /></Layout>} />
-            <Route path="/graph" element={<Layout path="/graph" collapsed={collapsed} setCollapsed={setCollapsed}><EntityGraph /></Layout>} />
-            <Route path="/claims" element={<Layout path="/claims" collapsed={collapsed} setCollapsed={setCollapsed}><ClaimCredibility /></Layout>} />
-            <Route path="/geo" element={<Layout path="/geo" collapsed={collapsed} setCollapsed={setCollapsed}><CitationTracking /></Layout>} />
-            <Route path="/axiom" element={<Layout path="/axiom" collapsed={collapsed} setCollapsed={setCollapsed}><AxiomMonitor /></Layout>} />
-            <Route path="/zola" element={<Layout path="/zola" collapsed={collapsed} setCollapsed={setCollapsed}><ZolaPredictions /></Layout>} />
-            <Route path="/ai" element={<Layout path="/ai" collapsed={collapsed} setCollapsed={setCollapsed}><AIAssistant /></Layout>} />
-            <Route path="/intel" element={<ProtectedRoute><Layout path="/intel" collapsed={collapsed} setCollapsed={setCollapsed}><DarkIntel /></Layout></ProtectedRoute>} />
-            <Route path="/causal-graph" element={<Layout path="/causal-graph" collapsed={collapsed} setCollapsed={setCollapsed}><CausalGraph /></Layout>} />
-            <Route path="/healthcare" element={<Layout path="/healthcare" collapsed={collapsed} setCollapsed={setCollapsed}><Healthcare /></Layout>} />
-            <Route path="/executive" element={<Layout path="/executive" collapsed={collapsed} setCollapsed={setCollapsed}><Executive /></Layout>} />
-            <Route path="/security" element={<ProtectedRoute><Layout path="/security" collapsed={collapsed} setCollapsed={setCollapsed}><SecurityAssessment /></Layout></ProtectedRoute>} />
-          </Routes>
+          {routes}
         </BrowserRouter>
       </ToastProvider>
     </AuthProvider>

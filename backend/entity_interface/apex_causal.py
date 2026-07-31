@@ -2,19 +2,23 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict
 import math
 import logging
+import time
 import numpy as np
+
+logger = logging.getLogger("sera.apex")
 
 _sentence_transformer = None
 _embeddings_cache = {}
 
 def get_encoder():
     global _sentence_transformer
-    print(f"[get_encoder] Checking _sentence_transformer: {id(_sentence_transformer)} (None={_sentence_transformer is None})", flush=True)
     if _sentence_transformer is None:
-        print("[get_encoder] Loading SentenceTransformer 'all-MiniLM-L6-v2'...", flush=True)
-        from sentence_transformers import SentenceTransformer
-        _sentence_transformer = SentenceTransformer('all-MiniLM-L6-v2')
-        print("[get_encoder] SentenceTransformer loaded successfully.", flush=True)
+        try:
+            from sentence_transformers import SentenceTransformer
+            _sentence_transformer = SentenceTransformer('all-MiniLM-L6-v2')
+        except Exception as e:
+            logger.warning(f"Failed to load SentenceTransformer: {e}")
+            _sentence_transformer = None
     return _sentence_transformer
 
 def get_embedding(text: str, model) -> list:
@@ -93,6 +97,14 @@ class APEXCausalEngine:
         self.objects: Dict[str, CausalObject] = {}
         self.morphisms: Dict[str, KMorphism] = {}
         self.homotopy_classes: Dict[str, List[str]] = {}  # class_name -> list of morphism keys
+        
+        # ✅ FIX: Add caching for Neo4j hydration
+        self._neo4j_cache = None
+        self._cache_timestamp = 0
+        self._cache_ttl = 300  # 5 minutes cache TTL
+        
+        # ✅ FIX: Track if hydrated
+        self._is_hydrated = False
 
     # ------------------------------------------------------------------
     # Core category operations
@@ -578,6 +590,9 @@ class APEXCausalEngine:
         default abstraction_level=0 and domain='kronos' unless the node
         already exists in self.objects.
         """
+        # ✅ FIX: Only log at debug level to prevent spam
+        logger.debug(f"APEX: Ingesting {len(kronos_edges)} Kronos edges")
+        
         for edge in kronos_edges:
             source = edge["source"]
             target = edge["target"]
@@ -650,19 +665,32 @@ class APEXCausalEngine:
             "n_total_morphisms": len(self.morphisms),
             "max_causal_depth": sig["max_depth"],
             "morphism_source": "cifn_activation_derived",
+            "is_hydrated": self._is_hydrated,
         }
 
     def hydrate_from_neo4j(self, driver) -> None:
         """
         Hydrate Category Objects and Morphisms directly from Neo4j.
         Replaces existing ConceptNet mock nodes/morphisms with real Neo4j property models.
+        
+        ✅ FIX: Added caching to prevent repeated expensive queries
         """
+        # ✅ FIX: Check cache first
+        current_time = time.time()
+        if self._neo4j_cache is not None and (current_time - self._cache_timestamp) < self._cache_ttl:
+            logger.debug("APEX: Using cached Neo4j data")
+            # Restore from cache
+            self.objects, self.morphisms, self.homotopy_classes = self._neo4j_cache
+            self._is_hydrated = True
+            return
+
+        logger.info("APEX: Hydrating from Neo4j (cache miss or expired)")
+        
         # Load SentenceTransformer model safely
         model = None
         try:
             model = get_encoder()
         except Exception as e:
-            logger = logging.getLogger("sera.apex")
             logger.warning(f"SentenceTransformer not available or offline: {e}. Using mock/fallback embeddings.")
 
         # Wipe current objects and morphisms before hydrating to ensure fresh state
@@ -673,12 +701,12 @@ class APEXCausalEngine:
         with driver.session() as neo_session:
             # 1. Fetch Companies
             c_res = neo_session.run("MATCH (c:Company) RETURN c.ticker AS ticker, c.legal_name AS name, c.sector AS sector")
+            company_count = 0
             for record in c_res:
                 ticker = record["ticker"]
                 name = record["name"]
                 sector = record["sector"]
                 
-                # Generate embedding
                 emb = get_embedding(f"{name} {sector}", model)
 
                 obj = CausalObject(
@@ -686,12 +714,14 @@ class APEXCausalEngine:
                     name=name,
                     embedding=emb,
                     abstraction_level=0,
-                    domain=sector.lower()
+                    domain=sector.lower() if sector else "unknown"
                 )
                 self.add_object(obj)
+                company_count += 1
 
             # 2. Fetch Jobs
             j_res = neo_session.run("MATCH (j:Job) RETURN j.id AS id, j.title AS name, 'job' AS sector")
+            job_count = 0
             for record in j_res:
                 id_val = record["id"]
                 name = record["name"]
@@ -707,9 +737,11 @@ class APEXCausalEngine:
                     domain=sector
                 )
                 self.add_object(obj)
+                job_count += 1
 
             # 3. Fetch News
             n_res = neo_session.run("MATCH (n:News) RETURN n.gdelt_id AS id, n.title AS name, 'news' AS sector")
+            news_count = 0
             for record in n_res:
                 id_val = record["id"]
                 name = record["name"]
@@ -725,9 +757,11 @@ class APEXCausalEngine:
                     domain=sector
                 )
                 self.add_object(obj)
+                news_count += 1
 
             # 4. Fetch Vessels & Ports
             v_res = neo_session.run("MATCH (v:Vessel) RETURN v.imo AS id, v.name AS name, 'shipping' AS sector")
+            vessel_count = 0
             for record in v_res:
                 id_val = record["id"]
                 name = record["name"]
@@ -743,8 +777,10 @@ class APEXCausalEngine:
                     domain=sector
                 )
                 self.add_object(obj)
+                vessel_count += 1
 
             p_res = neo_session.run("MATCH (p:Port) RETURN p.name AS id, p.name AS name, 'shipping' AS sector")
+            port_count = 0
             for record in p_res:
                 id_val = record["id"]
                 name = record["name"]
@@ -760,6 +796,7 @@ class APEXCausalEngine:
                     domain=sector
                 )
                 self.add_object(obj)
+                port_count += 1
 
             # 5. Fetch all relationships (Morphisms)
             r_res = neo_session.run(
@@ -771,6 +808,7 @@ class APEXCausalEngine:
                        coalesce(r.weight, 1.0) AS weight
                 """
             )
+            morphism_count = 0
             for record in r_res:
                 src = record["source_id"]
                 tgt = record["target_id"]
@@ -790,6 +828,21 @@ class APEXCausalEngine:
                         action_value=0.0
                     )
                     self.add_morphism(morphism)
+                    morphism_count += 1
+
+        logger.info(f"APEX: Hydrated {company_count} companies, {job_count} jobs, {news_count} news, {vessel_count} vessels, {port_count} ports, {morphism_count} morphisms")
+        
+        # ✅ FIX: Save to cache
+        self._neo4j_cache = (self.objects, self.morphisms, self.homotopy_classes)
+        self._cache_timestamp = time.time()
+        self._is_hydrated = True
+
+    def clear_cache(self) -> None:
+        """Clear the Neo4j hydration cache."""
+        self._neo4j_cache = None
+        self._cache_timestamp = 0
+        self._is_hydrated = False
+        logger.info("APEX: Cache cleared")
 
     def homotopy_equivalent(self, id1: str, id2: str) -> tuple:
         """
@@ -812,8 +865,6 @@ class APEXCausalEngine:
         similarity = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
         similarity = float(similarity)
         return similarity > 0.85, round(similarity, 4)
-
-    @property
 
     def find_all_paths(self, source_id: str, target_id: str, max_depth: int = 4) -> list:
         """
@@ -853,6 +904,6 @@ class APEXCausalEngine:
 
         return paths
 
+
 # Class Alias mapping for backward compatibility
 InfinityCausalCategory = APEXCausalEngine
-
