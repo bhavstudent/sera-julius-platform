@@ -15,8 +15,8 @@ async def get_axiom_monitor():
             total_res = await session.execute(select(func.count(CompanyModel.id)))
             total_entities = total_res.scalar() or 0
             
-            # Fetch only the first 50 companies for detailed display
-            comp_res = await session.execute(select(CompanyModel).limit(50))
+            # Fetch top 10 companies for instant live response
+            comp_res = await session.execute(select(CompanyModel).limit(10))
             companies = comp_res.scalars().all()
 
         entropy_summary = []
