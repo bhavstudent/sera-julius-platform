@@ -9,9 +9,15 @@ from config import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
+DB_URL = DATABASE_URL or ""
+if DB_URL.startswith("postgres://"):
+    DB_URL = DB_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DB_URL.startswith("postgresql://") and "+asyncpg" not in DB_URL:
+    DB_URL = DB_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 # Configure engine kwargs dynamically for production PostgreSQL vs SQLite
 engine_kwargs = {"echo": False, "future": True}
-if DATABASE_URL.startswith("postgresql"):
+if DB_URL.startswith("postgresql"):
     engine_kwargs.update({
         "pool_size": 20,
         "max_overflow": 10,
@@ -19,7 +25,12 @@ if DATABASE_URL.startswith("postgresql"):
         "pool_pre_ping": True
     })
 
-engine = create_async_engine(DATABASE_URL, **engine_kwargs)
+try:
+    engine = create_async_engine(DB_URL, **engine_kwargs)
+except Exception as _e:
+    logger.error(f"[DATABASE] Engine creation error: {_e}")
+    engine = create_async_engine("sqlite+aiosqlite:///./sera_db.sqlite3", echo=False, future=True)
+
 async_session_maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
