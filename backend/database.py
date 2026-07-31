@@ -48,7 +48,7 @@ async def verify_db_connection() -> None:
     except Exception:
         redacted_url = str(DATABASE_URL)
         
-    max_retries = 5
+    max_retries = 2
     retry_delay = 1.0
     
     for attempt in range(1, max_retries + 1):
@@ -59,14 +59,13 @@ async def verify_db_connection() -> None:
             return
         except Exception as e:
             if attempt == max_retries:
-                raise RuntimeError(
-                    f"Cannot connect to database at {redacted_url} after {max_retries} attempts. Details: {e}"
-                ) from e
+                logger.warning(f"[DATABASE] Could not verify DB connection: {e}. Starting anyway.")
+                return  # Don't crash — let FastAPI handle DB errors per-request
             logger.warning(
                 f"[DATABASE] Connection attempt {attempt}/{max_retries} failed. Retrying in {retry_delay}s... Error: {e}"
             )
             await asyncio.sleep(retry_delay)
-            retry_delay *= 2.0
+            retry_delay = min(retry_delay * 2.0, 2.0)  # cap at 2 seconds
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:

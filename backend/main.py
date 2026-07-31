@@ -301,8 +301,38 @@ def run_heavy_sync_job():
 async def startup():
     global _main_event_loop
     _main_event_loop = asyncio.get_running_loop()
-    # Warm up SentenceTransformer model in background to avoid blocking Uvicorn startup
-    async def _async_warmup():
+
+    # ── Run ALL heavy initialization in background so Render health checks pass instantly ──
+    async def _background_init():
+        # 1. Redis
+        try:
+            await init_redis()
+            logger.info("[STARTUP] Redis initialized.")
+        except Exception as e:
+            logger.warning(f"[STARTUP] Redis init notice: {e}")
+
+        # 2. DB (tables / migrations)
+        try:
+            await init_db()
+            logger.info("[STARTUP] DB initialized.")
+        except Exception as e:
+            logger.warning(f"[STARTUP] DB init notice: {e}")
+
+        # 3. Entity registry bootstrap
+        try:
+            await entity_registry._bootstrap_async()
+            logger.info("[STARTUP] Entity registry bootstrapped.")
+        except Exception as e:
+            logger.warning(f"[STARTUP] Registry bootstrap notice: {e}")
+
+        # 4. Data ingestion (non-blocking fetch)
+        try:
+            from services.data_orchestrator import DataIngestionService
+            asyncio.create_task(DataIngestionService.fetch_all_sources())
+        except Exception as e:
+            logger.error(f"[STARTUP] Failed to trigger DataIngestionService: {e}", exc_info=True)
+
+        # 5. SentenceTransformer warmup
         try:
             logger.info("[STARTUP] Warming up APEX SentenceTransformer model in background...")
             from entity_interface.apex_causal import get_encoder
@@ -311,34 +341,18 @@ async def startup():
         except Exception as e:
             logger.warning(f"[STARTUP] Warning: Failed to warm up SentenceTransformer: {e}")
 
-    asyncio.create_task(_async_warmup())
+    # Fire all heavy work as a background task — returns immediately so health check passes
+    asyncio.create_task(_background_init())
 
-    try:
-        await init_redis()
-    except Exception as e:
-        logger.warning(f"[STARTUP] Redis init notice: {e}")
-
-    try:
-        await init_db()
-    except Exception as e:
-        logger.warning(f"[STARTUP] DB init notice: {e}")
-
-    try:
-        await entity_registry._bootstrap_async()
-    except Exception as e:
-        logger.warning(f"[STARTUP] Registry bootstrap notice: {e}")
-
+    # Start background services (lightweight, non-blocking)
     asyncio.create_task(auto_godel_loop())
     try:
         from services.threat_broadcaster import start_threat_services
         start_threat_services()
     except Exception as e:
         logger.error(f"[STARTUP] Failed to start threat services: {e}", exc_info=True)
-    try:
-        from services.data_orchestrator import DataIngestionService
-        asyncio.create_task(DataIngestionService.fetch_all_sources())
-    except Exception as e:
-        logger.error(f"[STARTUP] Failed to trigger DataIngestionService: {e}", exc_info=True)
+
+    logger.info("[STARTUP] Server is ready. Background initialization running...")
 
     # ─── START REAL-TIME LIVE ACTIVITY ENGINE ─────────────────────────────
     # This engine continuously generates synthetic events, tracks alert counts
