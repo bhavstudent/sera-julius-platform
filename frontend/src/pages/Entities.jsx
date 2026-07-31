@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { fetchEntities } from '../api/client'
 import GlassCard from '../components/GlassCard'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'https://sera-julius-intelligence-api.onrender.com'
 const AUTH_HEADERS = { 'X-API-Key': 'sera-demo-2026', 'Content-Type': 'application/json' }
 
 const DOMAIN_ICONS = {

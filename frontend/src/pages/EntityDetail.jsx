@@ -4,7 +4,7 @@ import { sendChat } from '../api/client'
 import GlassCard from '../components/GlassCard'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'https://sera-julius-intelligence-api.onrender.com'
 const AUTH_HEADERS = { 'X-API-Key': 'sera-demo-2026', 'Content-Type': 'application/json' }
 
 const SectionHeader = ({ icon, title, badge }) => (

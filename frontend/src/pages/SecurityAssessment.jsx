@@ -5,7 +5,7 @@ import GlassCard from '../components/GlassCard'
 import DetailExplainerModal from '../components/DetailExplainerModal'
 
 const API_KEY = import.meta.env.VITE_API_KEY || 'sera-demo-2026'
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL || 'https://sera-julius-intelligence-api.onrender.com'
 
 const headers = { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
 
