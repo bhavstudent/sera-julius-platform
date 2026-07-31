@@ -13,14 +13,15 @@ async def get_axiom_monitor():
         companies = []
         total_entities = 56
         try:
-            async with asyncio.timeout(1.0):
+            async def _fetch():
                 async with async_session_maker() as session:
                     from sqlalchemy import func
                     total_res = await session.execute(select(func.count(CompanyModel.id)))
-                    total_entities = total_res.scalar() or 56
-
+                    tot = total_res.scalar() or 56
                     comp_res = await session.execute(select(CompanyModel).limit(10))
-                    companies = comp_res.scalars().all()
+                    return tot, comp_res.scalars().all()
+
+            total_entities, companies = await asyncio.wait_for(_fetch(), timeout=1.0)
         except Exception:
             pass
 
