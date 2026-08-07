@@ -152,7 +152,7 @@ def get_entity_ai():
     try:
         from config import ENTITY_MODE
         if ENTITY_MODE == "live":
-            from entity_interface.live_entity import LiveEntity
+            from entity_interface import LiveEntity
             return LiveEntity()
         else:
             from entity_interface.mock_entity import MockEntity

@@ -32,8 +32,8 @@ try:
 except ImportError:
     TORCH_OK = False
     class _DummyNN:
-        Module = Any
-        Tensor = Any
+        Module = object
+        Tensor = object
     nn = _DummyNN
     torch = _DummyNN
     logger.warning("[JULIUS-AI] PyTorch not installed. Running in lightweight stub mode.")

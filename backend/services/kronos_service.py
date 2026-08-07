@@ -15,6 +15,7 @@ Capabilities:
 from __future__ import annotations
 
 import logging
+from typing import Dict, List, Optional, Tuple, Any
 try:
     import torch
     import torch.nn as nn
@@ -22,12 +23,11 @@ try:
 except ImportError:
     TORCH_OK = False
     class _DummyNN:
-        Module = Any
-        Tensor = Any
+        Module = object
+        Tensor = object
     nn = _DummyNN
     torch = _DummyNN
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 import hashlib
 import json

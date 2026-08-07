@@ -30,7 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("sera.backend")
 from core.entity_resolution import entity_registry
-from entity_interface.live_entity import LiveEntity
+from entity_interface import LiveEntity
 from entity_interface.signal_synthesizer import SignalSynthesizer
 
 # ============================================================================
@@ -134,7 +134,7 @@ async def auto_godel_loop():
         try:
             # ✅ FIXED: Import from zola router
             from routers.zola import _godel_loop, _godel_results
-            from entity_interface.live_entity import LiveEntity
+            from entity_interface import LiveEntity
             
             # Check if entity_ai is available
             try:

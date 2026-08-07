@@ -14,7 +14,7 @@ patch_payload = {
     "serviceDetails": {
         "envSpecificDetails": {
             "buildCommand": "pip install -r requirements-lite.txt",
-            "startCommand": 'sh -c "uvicorn main:app --host 0.0.0.0 --port $PORT"'
+            "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
         }
     }
 }
@@ -26,5 +26,5 @@ if r.status_code == 200:
 
 d = requests.post(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys", headers=headers)
 print("DEPLOY STATUS:", d.status_code)
-if d.status_code == 201:
+if d.status_code in [200, 201, 202]:
     print("NEW DEPLOY ID:", d.json().get("id"))
