@@ -32,6 +32,7 @@ except Exception as _e:
     engine = create_async_engine("sqlite+aiosqlite:///./sera_db.sqlite3", echo=False, future=True)
 
 async_session_maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_session_maker
 Base = declarative_base()
 
 async def verify_db_connection() -> None:

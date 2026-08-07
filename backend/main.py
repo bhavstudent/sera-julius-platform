@@ -723,8 +723,10 @@ async def startup():
 
     # Seed default Admin User
     try:
-        from services.auth_service import seed_default_admin
-        await seed_default_admin()
+        from services.auth_service import AuthService
+        from database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await AuthService.seed_default_admin(session)
     except Exception as e:
         logger.error(f"[STARTUP] Failed to seed default admin user: {e}")
 

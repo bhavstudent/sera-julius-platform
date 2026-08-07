@@ -25,6 +25,6 @@ if r.status_code == 200:
     print("PATCH SUCCESS:", r.json().get("name"))
 
 d = requests.post(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys", headers=headers)
-print("DEPLOY STATUS:", d.status_code)
-if d.status_code in [200, 201, 202]:
+print("DEPLOY TRIGGER HTTP STATUS:", d.status_code)
+if d.status_code in (200, 201) and d.text:
     print("NEW DEPLOY ID:", d.json().get("id"))
