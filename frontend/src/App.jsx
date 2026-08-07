@@ -17,6 +17,7 @@ import CausalGraph from './pages/CausalGraph'
 import Healthcare from './pages/Healthcare'
 import Executive from './pages/Executive'
 import SecurityAssessment from './pages/SecurityAssessment'
+import Omniscience from './pages/Omniscience'
 import Login from './pages/Login'
 import LandingPage from './pages/LandingPage'
 import ParticleBackground from './components/ParticleBackground'
@@ -47,7 +48,8 @@ const pages = {
   '/causal-graph': { title: 'APEX Causal Geometry', subtitle: 'Interactive force-directed property graph visualizations' },
   '/healthcare': { title: 'Healthcare CMS Dashboard', subtitle: 'Hospital admissions, Medicare spending, and pharmaceutical metrics by state' },
   '/executive': { title: 'Executive Intelligence Briefing', subtitle: 'Public corporate leadership transitions and alignments from LinkedIn' },
-  '/security': { title: 'Security Assessment Console', subtitle: 'Multi-agent authorized pentest pipeline — Recon → Analysis → Validation → Human Approval → Report' }
+  '/security': { title: 'Security Assessment Console', subtitle: 'Multi-agent authorized pentest pipeline — Recon → Analysis → Validation → Human Approval → Report' },
+  '/omniscience': { title: 'Omniscience Global Engine', subtitle: 'Unified Real-Time Perception • RAG Vector Memory • Autonomous Guardian Remediation' }
 }
 
 // ✅ FIX: Memoized Layout component to prevent unnecessary re-renders
@@ -118,6 +120,7 @@ export default function App() {
           {renderWithLayout(SecurityAssessment, '/security')}
         </ProtectedRoute>
       } />
+      <Route path="/omniscience" element={renderWithLayout(Omniscience, '/omniscience')} />
     </Routes>
   ), [renderWithLayout])
 

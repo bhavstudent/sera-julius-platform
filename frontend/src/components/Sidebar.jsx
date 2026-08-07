@@ -4,6 +4,7 @@ import { fetchZolaStatus } from '../api/client'
 
 const links = [
   { path: '/dashboard', icon: '📊', label: 'Dashboard' },
+  { path: '/omniscience', icon: '👁️', label: 'Omniscience Engine', badge: 'NEW' },
   { path: '/security', icon: '🛡️', label: 'Security Console', badge: 'STYX' },
   { path: '/zola', icon: '🔮', label: 'Causal Engine', badge: 'KRONOS' },
   { path: '/intel', icon: '🕵️', label: 'Dark Intel', badge: 'CLASSIFIED' },

@@ -1,3 +1,10 @@
+# ============================================================================
+# SERA Platform Main Entry Point - WITH SPYWARE/MONITORING ROUTERS
+# ============================================================================
+
+# ✅ FIXED: Add missing imports
+from typing import Optional, Dict, Any, List
+
 from services.redis_cache import init_redis, close_redis
 from routers import self_improvement
 import numpy as np
@@ -25,10 +32,26 @@ logger = logging.getLogger("sera.backend")
 from core.entity_resolution import entity_registry
 from entity_interface.live_entity import LiveEntity
 from entity_interface.signal_synthesizer import SignalSynthesizer
-from routers import dashboard, entities, axiom, zola, chat, stream, intel, insights, health, graph, semantic, dark_intel, citation, healthcare, executive
-from routers import security as security_router
-from routers import censys as censys_router
-from routers import auth as auth_router
+
+# ============================================================================
+# ROUTER IMPORTS - WITH SPYWARE/MONITORING ROUTERS ADDED
+# ============================================================================
+
+from routers import (
+    dashboard, entities, axiom, zola, chat, stream, intel, insights, 
+    health, graph, semantic, dark_intel, citation, healthcare, executive,
+    security as security_router,
+    censys as censys_router,
+    auth as auth_router,
+    omniscience as omniscience_router,
+    # ✅ NEW: Spyware/Monitoring Routers
+    terminal,           # Linux terminal/shell execution
+    darkweb,            # Dark web OSINT
+    node_control,       # Remote node control
+)
+
+# ✅ FIXED: Import geo_router from citation
+from routers.citation import geo_router
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -36,6 +59,10 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from services.autonomous_scanner import AutonomousScanner
 from security.measures import SecurityMeasures
+
+# ============================================================================
+# API KEY CONFIGURATION
+# ============================================================================
 
 # Task 1: Parse multi-key map from environment variable API_KEYS
 # Expected format: JSON dict mapping key to user/client ID, e.g. {"key1": "user1"}
@@ -79,6 +106,10 @@ else:
         if DEMO_API_KEY and DEMO_API_KEY not in API_KEYS:
             API_KEYS[DEMO_API_KEY] = "default_demo"
 
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+
 # Task 2: Configure rate limiting key resolver and limiter
 def get_rate_limit_key(request: Request) -> str:
     api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
@@ -88,7 +119,10 @@ def get_rate_limit_key(request: Request) -> str:
 
 limiter = Limiter(key_func=get_rate_limit_key, default_limits=["60/minute"])
 
-# Gödel Loop auto-scheduling constants
+# ============================================================================
+# GÖDEL LOOP AUTO-SCHEDULING
+# ============================================================================
+
 _godel_auto_step_counter = 0
 GODEL_AUTO_TRIGGER_EVERY = 50  # Run one Gödel generation every 50 optimize calls
 
@@ -98,7 +132,16 @@ async def auto_godel_loop():
     while True:
         await asyncio.sleep(300)  # Check every 5 minutes
         try:
-            from routers.zola import _godel_loop, _godel_results, entity_ai
+            # ✅ FIXED: Import from zola router
+            from routers.zola import _godel_loop, _godel_results
+            from entity_interface.live_entity import LiveEntity
+            
+            # Check if entity_ai is available
+            try:
+                from routers.zola import entity_ai
+            except ImportError:
+                entity_ai = None
+                
             if isinstance(entity_ai, LiveEntity) and _godel_loop is not None:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, _godel_loop.step_generation)
@@ -110,6 +153,10 @@ async def auto_godel_loop():
         except Exception as e:
             logger.error(f"[AUTO-GODEL] Error during Gödel generation step: {e}", exc_info=True)
 
+
+# ============================================================================
+# API KEY MIDDLEWARE
+# ============================================================================
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -134,8 +181,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             request.state.client_id = API_KEYS[api_key]
             return await call_next(request)
 
-        # Always allow auth endpoints, health checks, & API docs through without API key checks
-        if request.url.path in ("/", "/health", "/docs", "/openapi.json") or request.url.path.startswith("/api/auth") or request.url.path.startswith("/api/health"):
+        # Always allow auth endpoints, health checks, omniscience dashboard & API docs through without API key checks
+        if request.url.path in ("/", "/health", "/docs", "/openapi.json") or request.url.path.startswith("/api/auth") or request.url.path.startswith("/api/health") or request.url.path.startswith("/api/omniscience"):
             return await call_next(request)
 
         # Standard HTTP routes: accept key from header or query param.
@@ -152,9 +199,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# ============================================================================
+# FASTAPI APPLICATION
+# ============================================================================
+
 app = FastAPI(
     title="SERA Intelligence Platform",
-    description="Real-time behavioral intelligence API",
+    description="Real-time behavioral intelligence API with advanced security monitoring",
     version="1.0.0"
 )
 
@@ -162,10 +213,12 @@ from starlette.middleware.gzip import GZipMiddleware
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Order: Last added runs first (Starlette LIFO). CORSMiddleware must be added LAST to be outermost.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(SlowAPIMiddleware)
+
 # CORS must be outermost so ALL responses including OPTIONS preflight get Access-Control headers.
 app.add_middleware(
     CORSMiddleware,
@@ -175,10 +228,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ============================================================================
+# GLOBAL EXCEPTION HANDLER
+# ============================================================================
+
 @app.exception_handler(Exception)
 async def global_self_healing_exception_handler(request: Request, exc: Exception):
-    from services.self_healing_service import self_healing_agent
-    diag = await self_healing_agent.diagnose_and_heal(exc, endpoint=request.url.path)
+    try:
+        from services.self_healing_service import self_healing_agent
+        diag = await self_healing_agent.diagnose_and_heal(exc, endpoint=request.url.path)
+    except ImportError:
+        # Fallback if self_healing_service doesn't exist
+        diag = {"error": str(exc), "healing_applied": False}
+    except Exception as e:
+        diag = {"error": str(exc), "healing_error": str(e), "healing_applied": False}
+    
     return JSONResponse(
         status_code=500,
         content={
@@ -187,13 +252,22 @@ async def global_self_healing_exception_handler(request: Request, exc: Exception
         }
     )
 
-# CORSMiddleware is now added above near SlowAPIMiddleware (outermost position)
+
+# ============================================================================
+# HEALTH CHECK
+# ============================================================================
 
 @app.get("/")
 @app.get("/health")
 async def health_check_root():
     return {"status": "ok", "service": "sera-julius-backend", "version": "1.0"}
 
+
+# ============================================================================
+# ROUTER REGISTRATION - WITH SPYWARE/MONITORING ROUTERS ADDED
+# ============================================================================
+
+# --- Core Routers ---
 app.include_router(dashboard.router)
 app.include_router(entities.router, prefix="/api/entities", tags=["entities"])
 app.include_router(axiom.router)
@@ -207,17 +281,220 @@ app.include_router(graph.router)
 app.include_router(semantic.router)
 app.include_router(dark_intel.router)
 app.include_router(citation.router)
-app.include_router(citation.geo_router)
+app.include_router(geo_router)  # ✅ FIXED: Added geo_router
 app.include_router(healthcare.router)
 app.include_router(executive.router)
 app.include_router(security_router.router)
 app.include_router(censys_router.router)
 app.include_router(auth_router.router)
 app.include_router(self_improvement.router)
+app.include_router(omniscience_router.router)
+logger.info("[ROUTERS] Omniscience Engine router registered at /api/omniscience")
+
+# ============================================================================
+# ✅ NEW: SPYWARE/MONITORING ROUTERS REGISTRATION
+# ============================================================================
+
+# --- Terminal / Shell Execution ---
+app.include_router(terminal.router)
+logger.info("[ROUTERS] Terminal router registered at /api/terminal")
+
+# --- Dark Web OSINT ---
+app.include_router(darkweb.router)
+logger.info("[ROUTERS] Dark Web router registered at /api/darkweb")
+
+# --- Node Control ---
+app.include_router(node_control.router)
+logger.info("[ROUTERS] Node Control router registered at /api/nodes")
+
+# ============================================================================
+# ADDITIONAL SPYWARE/MONITORING API ENDPOINTS (Direct)
+# ============================================================================
+
+@app.get("/api/monitoring/status")
+async def get_monitoring_status():
+    """Get status of all monitoring services"""
+    try:
+        from services.monitoring.packet_sniffer import get_sniffer
+        from services.monitoring.network_scanner import get_scanner
+        from services.attack.arp_spoof import get_spoofer
+        from services.attack.dns_spoof import get_dns_spoofer
+        from services.attack.bgp_hijack_high import get_hijack_instance
+        
+        return {
+            "status": "ok",
+            "services": {
+                "packet_sniffer": get_sniffer().get_stats(),
+                "network_scanner": get_scanner().get_scan_status(),
+                "arp_spoofer": get_spoofer().get_status(),
+                "dns_spoofer": get_dns_spoofer().get_status(),
+                "bgp_hijack": get_hijack_instance().get_status()
+            }
+        }
+    except ImportError as e:
+        return {"status": "warning", "message": f"Some services not available: {str(e)}"}
+
+@app.post("/api/monitoring/packet/start")
+async def start_packet_monitoring(interface: str = "eth0"):
+    """Start packet sniffing"""
+    try:
+        from services.monitoring.packet_sniffer import start_packet_monitor
+        return start_packet_monitor(interface)
+    except ImportError as e:
+        return {"status": "error", "message": f"Packet sniffer not available: {str(e)}"}
+
+@app.post("/api/monitoring/packet/stop")
+async def stop_packet_monitoring():
+    """Stop packet sniffing"""
+    try:
+        from services.monitoring.packet_sniffer import stop_packet_monitor
+        return stop_packet_monitor()
+    except ImportError as e:
+        return {"status": "error", "message": f"Packet sniffer not available: {str(e)}"}
+
+@app.get("/api/monitoring/packet/detections")
+async def get_packet_detections(limit: int = 100):
+    """Get packet detections"""
+    try:
+        from services.monitoring.packet_sniffer import get_packet_detections
+        return get_packet_detections(limit)
+    except ImportError as e:
+        return {"status": "error", "message": f"Packet sniffer not available: {str(e)}"}
+
+@app.post("/api/monitoring/scan/start")
+async def start_network_scan(ip_range: Optional[str] = None):
+    """Start network scan"""
+    try:
+        from services.monitoring.network_scanner import start_network_scan
+        return start_network_scan(ip_range)
+    except ImportError as e:
+        return {"status": "error", "message": f"Network scanner not available: {str(e)}"}
+
+@app.get("/api/monitoring/scan/status")
+async def get_scan_status():
+    """Get scan status"""
+    try:
+        from services.monitoring.network_scanner import get_scan_status
+        return get_scan_status()
+    except ImportError as e:
+        return {"status": "error", "message": f"Network scanner not available: {str(e)}"}
+
+@app.get("/api/monitoring/scan/results")
+async def get_scan_results(limit: int = 10):
+    """Get scan results"""
+    try:
+        from services.monitoring.network_scanner import get_scan_results
+        return get_scan_results(limit)
+    except ImportError as e:
+        return {"status": "error", "message": f"Network scanner not available: {str(e)}"}
+
+@app.post("/api/attack/arp/start")
+async def start_arp_spoof(target_ip: str, gateway_ip: str, interface: str = "eth0"):
+    """Start ARP spoofing"""
+    try:
+        from services.attack.arp_spoof import start_arp_spoof
+        return start_arp_spoof(target_ip, gateway_ip, interface)
+    except ImportError as e:
+        return {"status": "error", "message": f"ARP spoof not available: {str(e)}"}
+
+@app.post("/api/attack/arp/stop")
+async def stop_arp_spoof():
+    """Stop ARP spoofing"""
+    try:
+        from services.attack.arp_spoof import stop_arp_spoof
+        return stop_arp_spoof()
+    except ImportError as e:
+        return {"status": "error", "message": f"ARP spoof not available: {str(e)}"}
+
+@app.get("/api/attack/arp/status")
+async def get_arp_status():
+    """Get ARP spoofing status"""
+    try:
+        from services.attack.arp_spoof import get_arp_status
+        return get_arp_status()
+    except ImportError as e:
+        return {"status": "error", "message": f"ARP spoof not available: {str(e)}"}
+
+@app.post("/api/attack/dns/start")
+async def start_dns_spoof(port: int = 53):
+    """Start DNS spoofing"""
+    try:
+        from services.attack.dns_spoof import start_dns_spoof
+        return start_dns_spoof(port)
+    except ImportError as e:
+        return {"status": "error", "message": f"DNS spoof not available: {str(e)}"}
+
+@app.post("/api/attack/dns/stop")
+async def stop_dns_spoof():
+    """Stop DNS spoofing"""
+    try:
+        from services.attack.dns_spoof import stop_dns_spoof
+        return stop_dns_spoof()
+    except ImportError as e:
+        return {"status": "error", "message": f"DNS spoof not available: {str(e)}"}
+
+@app.post("/api/attack/bgp/start")
+async def start_bgp_hijack():
+    """Start BGP hijacking"""
+    try:
+        from services.attack.bgp_hijack_high import run_high_hijack
+        return run_high_hijack()
+    except ImportError as e:
+        return {"status": "error", "message": f"BGP hijack not available: {str(e)}"}
+
+@app.post("/api/attack/bgp/stop")
+async def stop_bgp_hijack():
+    """Stop BGP hijacking"""
+    try:
+        from services.attack.bgp_hijack_high import stop_high_hijack
+        return stop_high_hijack()
+    except ImportError as e:
+        return {"status": "error", "message": f"BGP hijack not available: {str(e)}"}
+
+@app.get("/api/attack/bgp/status")
+async def get_bgp_status():
+    """Get BGP hijacking status"""
+    try:
+        from services.attack.bgp_hijack_high import get_hijack_status
+        return get_hijack_status()
+    except ImportError as e:
+        return {"status": "error", "message": f"BGP hijack not available: {str(e)}"}
+
+@app.post("/api/attack/full/start")
+async def start_full_attack(target: str, gateway: str, interface: str = "eth0"):
+    """Start full attack chain"""
+    try:
+        from services.attack.full_attack import run_full_attack
+        return run_full_attack(target, gateway, interface)
+    except ImportError as e:
+        return {"status": "error", "message": f"Full attack not available: {str(e)}"}
+
+@app.post("/api/attack/full/stop")
+async def stop_full_attack():
+    """Stop full attack chain"""
+    try:
+        from services.attack.full_attack import stop_full_attack
+        return stop_full_attack()
+    except ImportError as e:
+        return {"status": "error", "message": f"Full attack not available: {str(e)}"}
+
+@app.get("/api/attack/full/status")
+async def get_full_attack_status():
+    """Get full attack status"""
+    try:
+        from services.attack.full_attack import get_attack_status
+        return get_attack_status()
+    except ImportError as e:
+        return {"status": "error", "message": f"Full attack not available: {str(e)}"}
+
+
+# ============================================================================
+# BACKGROUND JOB HELPERS
+# ============================================================================
 
 _sec_failure_count = 0
-
 _main_event_loop = None
+
 
 def _submit_async_job(coro_fn):
     global _main_event_loop
@@ -233,17 +510,21 @@ def _submit_async_job(coro_fn):
         except Exception:
             asyncio.run(coro_fn())
 
+
 def run_gdelt_job():
     from services.data_orchestrator import DataIngestionService
     _submit_async_job(DataIngestionService.run_gdelt_ingestion)
+
 
 def run_ais_jobs_job():
     from services.data_orchestrator import DataIngestionService
     _submit_async_job(DataIngestionService.run_ais_jobs_ingestion)
 
+
 def run_executive_job():
     from services.data_orchestrator import DataIngestionService
     _submit_async_job(DataIngestionService.run_executive_ingestion)
+
 
 def run_heavy_sync_job():
     global _sec_failure_count
@@ -296,6 +577,10 @@ def run_heavy_sync_job():
 
     _submit_async_job(_async_run)
 
+
+# ============================================================================
+# STARTUP EVENTS
+# ============================================================================
 
 @app.on_event("startup")
 async def startup():
@@ -427,6 +712,7 @@ async def startup():
             logger.error(f"[STARTUP] Failed to start autonomous scanner: {e}")
     else:
         logger.info("[STARTUP] Autonomous STYX scanner disabled.")
+    
     # Always start the threat broadcast loop
     try:
         from services.threat_broadcaster import threat_broadcast_loop
@@ -441,7 +727,6 @@ async def startup():
         await seed_default_admin()
     except Exception as e:
         logger.error(f"[STARTUP] Failed to seed default admin user: {e}")
-
 
     # ─── EXTERNAL NETWORK SCANNER ────────────────────────────────────
     if os.getenv("EXTERNAL_SCANNER_ENABLED", "false").lower() == "true":
@@ -466,6 +751,34 @@ async def startup():
     else:
         logger.info("[STARTUP] External network scanner disabled.")
 
+    # ─── START MONITORING SERVICES ──────────────────────────────────
+    # Start packet monitoring if enabled
+    if os.getenv("PACKET_MONITOR_ENABLED", "false").lower() == "true":
+        try:
+            from services.monitoring.packet_sniffer import start_packet_monitor
+            start_packet_monitor(os.getenv("PACKET_INTERFACE", "eth0"))
+            logger.info("[STARTUP] Packet monitor started.")
+        except Exception as e:
+            logger.error(f"[STARTUP] Failed to start packet monitor: {e}")
+
+    # Start ARP spoofing if configured with target
+    if os.getenv("ARP_SPOOF_ENABLED", "false").lower() == "true":
+        try:
+            target = os.getenv("ARP_TARGET", "")
+            gateway = os.getenv("ARP_GATEWAY", "")
+            if target and gateway:
+                from services.attack.arp_spoof import start_arp_spoof
+                start_arp_spoof(target, gateway, os.getenv("ARP_INTERFACE", "eth0"))
+                logger.info(f"[STARTUP] ARP spoofing started: {target} -> {gateway}")
+            else:
+                logger.warning("[STARTUP] ARP spoofing not started: missing TARGET or GATEWAY")
+        except Exception as e:
+            logger.error(f"[STARTUP] Failed to start ARP spoofing: {e}")
+
+
+# ============================================================================
+# ADDITIONAL API ENDPOINTS (Existing - Unchanged)
+# ============================================================================
 
 @app.get("/api/synthesize/{entity_id}")
 async def synthesize_signals(entity_id: str):
@@ -643,6 +956,10 @@ async def get_entity_connections(entity_id: str, min_confidence: float = 0.0):
         )
     }
 
+
+# ============================================================================
+# ALETHEIA CLAIMS ENDPOINTS (Existing - Unchanged)
+# ============================================================================
 
 class ClaimCreate(BaseModel):
     claimant_id: str = None
@@ -840,7 +1157,6 @@ def _build_claim_response(claim_obj, challenges, evidence_rows, scoring: dict) -
             "(1 - challenge_penalty) * evidence_boost * apex_bonus. Uses simulated point-value stakes only."
         )
     }
-
 
 
 @app.post("/api/claims")
@@ -1065,21 +1381,26 @@ async def reaffirm_claim(claim_id: str):
         }
 
 
-
+# ============================================================================
+# ROOT ENDPOINT
+# ============================================================================
 
 @app.get("/")
 async def root():
     return {"message": "SERA Intelligence Platform API", "status": "online", "version": "1.0.0"}
 
 
-# GEO Citation Tracking Features
+# ============================================================================
+# CITATION TRACKING ENDPOINTS (GEO) - Existing
+# ============================================================================
+
 class TrackedQueryCreate(BaseModel):
     query_text: str = Field(..., min_length=1)
     target_entity_name: str = Field(..., min_length=1)
 
+
 def simulate_citation_check(query_text: str, target_entity_name: str, ai_platform: str):
-    # Clearly labeled SIMULATED citation check function.
-    # Deterministic simulation rules per platform:
+    """Clearly labeled SIMULATED citation check function."""
     cleaned_query = query_text.lower()
     cleaned_target = target_entity_name.lower()
     
@@ -1087,10 +1408,9 @@ def simulate_citation_check(query_text: str, target_entity_name: str, ai_platfor
         was_cited = (cleaned_target in cleaned_query) or ((len(query_text) + len(target_entity_name)) % 2 == 0)
     elif ai_platform == "perplexity":
         was_cited = (cleaned_target in cleaned_query) or ((len(query_text) * len(target_entity_name)) % 3 != 0)
-    else: # gemini
+    else:  # gemini
         was_cited = (cleaned_target in cleaned_query) or ((len(query_text) + 5) % 3 == 0)
 
-    # Competitor list
     all_competitors = ["Aether Systems", "Helix Causal", "KRONOS Labs", "ZOLA Dynamics", "Cognitive Wave"]
     competitor_names_cited = [c for c in all_competitors if c.lower() != cleaned_target][:2]
     
@@ -1262,23 +1582,23 @@ async def get_entity_citation_rate(entity_name: str):
             "proof_of_concept_note": "PROOF OF CONCEPT: All underlying checks are simulated."
         }
 
-# =====================================================================
-# MERGED PATH COGNITIVE LAYER ENDPOINTS (from client-project)
-# =====================================================================
+
+# ============================================================================
+# MERGED PATH COGNITIVE LAYER ENDPOINTS - Existing
+# ============================================================================
 
 @app.post("/api/synthesize/{entity_id}/outcome")
 async def record_signal_outcome(entity_id: str, realized_outcome: float):
     """
     Continuous-learning feedback: record the realised outcome (in [0,1]) for an
     entity that was previously synthesized. Updates each signal source's learned
-    reliability and the adaptive blend weights (the signal-manufacturer moat:
-    intelligence that compounds from outcome feedback).
+    reliability and the adaptive blend weights.
     """
-    from entity_interface.live_entity import entity_registry
     from entity_interface.signal_synthesizer import SignalSynthesizer
     if not entity_registry.get_by_id(entity_id):
         raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found in registry.")
     return SignalSynthesizer.record_outcome(entity_id, realized_outcome)
+
 
 @app.get("/api/entity/mesh")
 async def entity_mesh_verify():
@@ -1286,10 +1606,10 @@ async def entity_mesh_verify():
     "The Entity" distributed substrate — verify the benign distributed-systems
     primitives: federated learning (FedAvg), Byzantine fault-tolerant consensus,
     Kademlia-style DHT peer discovery, and privacy-preserving secure aggregation.
-    (No evasion / anti-forensics / self-migration code is included.)
     """
     from entity_interface.entity_mesh import verify_entity_mesh
     return verify_entity_mesh()
+
 
 @app.get("/api/entity/emergence-markers")
 async def entity_emergence_markers():
@@ -1301,12 +1621,13 @@ async def entity_emergence_markers():
     from entity_interface.emergence_markers import emergence_report
     return emergence_report()
 
+
 @app.get("/api/graph/entity/{entity_id}/multihop")
 async def get_entity_multihop(entity_id: str, depth: int = 2, min_confidence: float = 0.0):
     """
     Multi-hop breadth-first traversal of the entity relationship graph, returning
-    node + edge data suitable for a force-directed graph visualisation (not just a
-    1-hop table). Depth is capped at 4 to bound the query.
+    node + edge data suitable for a force-directed graph visualisation.
+    Depth is capped at 4 to bound the query.
     """
     depth = max(1, min(int(depth), 4))
     from database import async_session_maker
@@ -1362,6 +1683,11 @@ async def get_entity_multihop(entity_id: str, depth: int = 2, min_confidence: fl
             "note": "multi-hop BFS traversal — node/edge graph data for force-directed visualization",
         }
 
+
+# ============================================================================
+# SHUTDOWN EVENTS
+# ============================================================================
+
 @app.on_event("shutdown")
 async def shutdown():
     await close_redis()
@@ -1372,3 +1698,47 @@ async def shutdown():
     if hasattr(app.state, "external_orchestrator"):
         logger.info("[SHUTDOWN] External orchestrator stopped.")
         # The background task will be cancelled on shutdown.
+    
+    if hasattr(app.state, "scheduler"):
+        app.state.scheduler.shutdown()
+        logger.info("[SHUTDOWN] Scheduler stopped.")
+
+    # Stop monitoring services
+    try:
+        from services.monitoring.packet_sniffer import stop_packet_monitor
+        stop_packet_monitor()
+        logger.info("[SHUTDOWN] Packet monitor stopped.")
+    except Exception as e:
+        logger.warning(f"[SHUTDOWN] Error stopping packet monitor: {e}")
+
+    try:
+        from services.attack.arp_spoof import stop_arp_spoof
+        stop_arp_spoof()
+        logger.info("[SHUTDOWN] ARP spoofing stopped.")
+    except Exception as e:
+        logger.warning(f"[SHUTDOWN] Error stopping ARP spoofing: {e}")
+
+    try:
+        from services.attack.dns_spoof import stop_dns_spoof
+        stop_dns_spoof()
+        logger.info("[SHUTDOWN] DNS spoofing stopped.")
+    except Exception as e:
+        logger.warning(f"[SHUTDOWN] Error stopping DNS spoofing: {e}")
+
+    try:
+        from services.attack.bgp_hijack_high import stop_high_hijack
+        stop_high_hijack()
+        logger.info("[SHUTDOWN] BGP hijack stopped.")
+    except Exception as e:
+        logger.warning(f"[SHUTDOWN] Error stopping BGP hijack: {e}")
+
+    logger.info("[SHUTDOWN] SERA platform shutdown complete.")
+
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,33 +1,244 @@
---extra-index-url https://download.pytorch.org/whl/cpu
+# ============================================================
+# SERA Platform - Production Dependencies (FIXED - COMPLETE)
+# ============================================================
+# Python 3.10+ required
+# Install with: pip install -r requirements.txt
+# ============================================================
+
+# ============================================================
+# CORE FRAMEWORKS
+# ============================================================
+
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.9.0
+python-dotenv>=1.0.1
+python-multipart>=0.0.9
+pyyaml>=6.0.1
+
+# ============================================================
+# ASYNCHRONOUS & CONCURRENCY
+# ============================================================
+
+httpx>=0.27.0
+aiohttp>=3.9.0
+websockets>=13.0
+# asyncio is built-in, no need to install
+
+# ============================================================
+# DATABASES
+# ============================================================
+
+# PostgreSQL
 sqlalchemy[asyncio]>=2.0.35
 asyncpg>=0.30.0
+alembic>=1.13.0
+
+# SQLite
 aiosqlite>=0.19.0
-faker>=28.0.0
+
+# Neo4j (Graph Database)
+neo4j>=5.20.0
+
+# Redis (Cache & Sessions)
+redis>=5.0.0
+
+# ============================================================
+# MACHINE LEARNING & NUMERICAL COMPUTING
+# ============================================================
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchvision>=0.15.0
 numpy>=1.26.0
-websockets>=13.0
-python-dotenv>=1.0.1
-httpx>=0.27.0
-torch
-slowapi>=0.1.9
-apscheduler>=3.10.0
-yfinance>=0.2.38
+scipy>=1.11.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+
+# ============================================================
+# AI & LANGUAGE MODELS
+# ============================================================
+
+# OpenAI (for AutoGen)
+openai>=1.30.0
+
+# AutoGen Framework
+autogen-agentchat>=0.2.0
+autogen-ext>=0.2.0
+
+# Anthropic (alternative LLM)
+anthropic>=0.39.0
+
+# ============================================================
+# DATA VISUALIZATION
+# ============================================================
+
+matplotlib>=3.7.0
+plotly>=5.17.0
+networkx>=3.1.0
+
+# ============================================================
+# DATA INGESTION & EXTERNAL APIS
+# ============================================================
+
+requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.1.0
-neo4j>=5.20.0
+yfinance>=0.2.38
 apify-client>=1.0.0
-scapy>=2.5.0
-docker>=6.1.3
-anthropic>=0.39.0
-openai>=1.30.0
-validators>=0.22.0
-requests>=2.31.0
 google-cloud-bigquery>=3.17.0
-scikit-learn>=1.3.0
+validators>=0.22.0
+feedparser>=6.0.10
+
+# ============================================================
+# SECURITY & AUTHENTICATION
+# ============================================================
+
 bcrypt>=4.1.2
 pyjwt>=2.8.0
-python-multipart>=0.0.9
+cryptography>=41.0.0
+passlib>=1.7.4
+python-jose>=3.3.0
+
+# ============================================================
+# MONITORING & METRICS
+# ============================================================
+
 prometheus-client>=0.17.0
-redis>=5.0.0
+psutil>=5.9.0
+slowapi>=0.1.9
+apscheduler>=3.10.0
+
+# ============================================================
+# ⚠️ NETWORKING & SYSTEM (SPYWARE/MONITORING CAPABILITIES)
+# ============================================================
+
+# Network packet manipulation (authorized use only)
+scapy>=2.5.0
+
+# SSH connections for remote operations (authorized use only)
+paramiko>=3.3.1
+
+# Interactive session management for shell (authorized use only)
+pexpect>=4.8.0
+
+# IP address manipulation
+ipaddress>=1.0.23
+
+# Docker API client
+docker>=6.1.3
+
+# DNS Spoofing & MITM (authorized use only)
+mitmproxy>=12.0.0
+
+# Dark Web / Tor (authorized use only)
+stem>=1.8.0
+
+# SOCKS5 Proxy (Tor connections)
+pysocks>=1.7.0
+
+# Windows Remote Operations (authorized use only)
+pywinrm>=0.4.0
+
+# ============================================================
+# ALTERNATIVE NETWORK SCANNING (WINDOWS COMPATIBLE)
+# ============================================================
+
+# For network scanning (alternative to python-nmap)
+netifaces>=0.11.0
+ping3>=4.0.4
+
+# ============================================================
+# ADDITIONAL MONITORING DEPENDENCIES
+# ============================================================
+
+# Packet capture (Windows compatible)
+pyshark>=0.6.0
+
+# Network analysis
+dpkt>=1.9.8
+
+# ============================================================
+# TESTING & DEVELOPMENT
+# ============================================================
+
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+faker>=28.0.0
+
+# ============================================================
+# UTILITIES
+# ============================================================
+
+python-dateutil>=2.8.2
+email-validator>=2.0.0
+jinja2>=3.1.2
+markdown>=3.5.0
+tabulate>=0.9.0
+tqdm>=4.66.0
+colorama>=0.4.6
+
+# ============================================================
+# DATA PROCESSING
+# ============================================================
+
+pytz>=2023.3
+pillow>=10.0.0
+chardet>=5.0.0
+ujson>=5.8.0
+
+# ============================================================
+# RAG & VECTOR DATABASES
+# ============================================================
+
+chromadb>=0.4.0  # Vector database for RAG
+faiss-cpu>=1.7.4  # Vector similarity search
+
+# ============================================================
+# DEPLOYMENT & INFRASTRUCTURE
+# ============================================================
+
+gunicorn>=21.2.0  # Production WSGI server
+uvloop>=0.19.0  # Fast event loop for uvicorn
+httptools>=0.6.0  # HTTP parser for uvicorn
+
+# ============================================================
+# WINDOWS-SPECIFIC COMPATIBILITY FIXES
+# ============================================================
+
+# For Windows compatibility with scapy
+# scapy works on Windows but requires Npcap
+# Download Npcap from: https://npcap.com/
+# Make sure to install in "WinPcap API-compatible Mode"
+
+# ============================================================
+# INSTALLATION NOTES
+# ============================================================
+# 
+# ⚠️ If you get an error with pexpect on Windows, install:
+# pip install pexpect
+# 
+# ⚠️ If you get an error with python-nmap:
+# It's not recommended for Windows. Use:
+# 1. Install nmap from: https://nmap.org/download.html
+# 2. Add nmap to PATH
+# 
+# ⚠️ If you get an error with pcapy:
+# pcapy is not compatible with Python 3.13+
+# Use scapy instead (already installed)
+# 
+# ⚠️ For DNS spoofing:
+# 1. Install mitmproxy (included)
+# 2. Run as Administrator
+# 
+# ⚠️ For Dark Web:
+# 1. Install Tor from: https://www.torproject.org/
+# 2. Run Tor service
+# 
+# For Windows network scanning alternatives:
+# pip install nmapthon2  # Alternative to python-nmap
+# 
+# ============================================================

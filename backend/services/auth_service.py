@@ -1,121 +1,159 @@
 """
-SERA Authentication Service
-============================
-JWT token generation/verification, password hashing, and default admin seeding.
+Auth Service
+============
+Authentication service for user login, registration, and JWT management.
 """
 
-import os
 import logging
-import hashlib
-import hmac
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict
+from datetime import datetime, timedelta
+from typing import Optional
+import jwt
+import bcrypt
+import os
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from database import async_session_maker
-from models.user import User
 
-logger = logging.getLogger("sera.auth_service")
+from models.user import UserModel
 
-# Secret key for JWT signing
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "sera-super-secret-jwt-key-2026-hyper-secure")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+logger = logging.getLogger(__name__)
 
-
-def hash_password(password: str) -> str:
-    """Hash password using SHA-256 with salt."""
-    salt = "sera_salt_2026"
-    return hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode('utf-8'),
-        salt.encode('utf-8'),
-        100000
-    ).hex()
+# JWT Configuration
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", 24))
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash."""
-    return hmac.compare_digest(hash_password(plain_password), hashed_password)
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT-style bearer token (base64 + HMAC signature)."""
-    import base64
-    import json
-
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": int(expire.timestamp())})
-
-    # Encode header & payload
-    header = {"alg": "HS256", "typ": "JWT"}
-    header_bytes = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
-    payload_bytes = base64.urlsafe_b64encode(json.dumps(to_encode).encode()).decode().rstrip("=")
-
-    signature_input = f"{header_bytes}.{payload_bytes}".encode()
-    signature = hmac.new(SECRET_KEY.encode(), signature_input, hashlib.sha256).digest()
-    sig_bytes = base64.urlsafe_b64encode(signature).decode().rstrip("=")
-
-    return f"{header_bytes}.{payload_bytes}.{sig_bytes}"
-
-
-def decode_access_token(token: str) -> Optional[dict]:
-    """Decode and verify token."""
-    import base64
-    import json
-
-    try:
-        parts = token.split(".")
-        if len(parts) != 3:
+class AuthService:
+    """
+    Authentication service for user management and JWT handling.
+    """
+    
+    @staticmethod
+    async def get_user_by_username(db: AsyncSession, username: str) -> Optional[UserModel]:
+        """Get a user by username."""
+        result = await db.execute(
+            select(UserModel).where(UserModel.username == username)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def get_user_by_email(db: AsyncSession, email: str) -> Optional[UserModel]:
+        """Get a user by email."""
+        result = await db.execute(
+            select(UserModel).where(UserModel.email == email)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def create_user(
+        db: AsyncSession,
+        username: str,
+        email: str,
+        password: str,
+        role: str = "ANALYST"
+    ) -> UserModel:
+        """Create a new user."""
+        # Check if user exists
+        existing = await AuthService.get_user_by_username(db, username)
+        if existing:
+            raise ValueError(f"User with username '{username}' already exists")
+        
+        existing_email = await AuthService.get_user_by_email(db, email)
+        if existing_email:
+            raise ValueError(f"User with email '{email}' already exists")
+        
+        # Create user
+        user = UserModel(
+            username=username,
+            email=email,
+            role=role,
+            is_active=True,
+            created_at=datetime.utcnow()
+        )
+        user.hashed_password = AuthService._hash_password(password)
+        
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        logger.info(f"[AUTH] User created: {username} ({role})")
+        return user
+    
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        """Hash a password using bcrypt."""
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    
+    @staticmethod
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against its hash."""
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    
+    @staticmethod
+    async def authenticate_user(
+        db: AsyncSession,
+        username: str,
+        password: str
+    ) -> Optional[UserModel]:
+        """Authenticate a user by username and password."""
+        user = await AuthService.get_user_by_username(db, username)
+        if not user:
             return None
-
-        header_b64, payload_b64, sig_b64 = parts
-
-        # Verify signature
-        sig_input = f"{header_b64}.{payload_b64}".encode()
-        expected_sig = hmac.new(SECRET_KEY.encode(), sig_input, hashlib.sha256).digest()
-
-        # Add padding back for base64 decode
-        rem = len(sig_b64) % 4
-        if rem:
-            sig_b64 += "=" * (4 - rem)
-        actual_sig = base64.urlsafe_b64decode(sig_b64)
-
-        if not hmac.compare_digest(actual_sig, expected_sig):
+        if not user.is_active:
             return None
-
-        # Decode payload
-        rem_p = len(payload_b64) % 4
-        if rem_p:
-            payload_b64 += "=" * (4 - rem_p)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode())
-
-        # Check expiry
-        if payload.get("exp", 0) < int(datetime.now(timezone.utc).timestamp()):
+        if not AuthService.verify_password(password, user.hashed_password):
             return None
-
-        return payload
-    except Exception as e:
-        logger.error(f"Token decode error: {e}")
-        return None
-
-
-async def seed_default_admin():
-    """Ensure a default SUPER_ADMIN user exists on startup."""
-    async with async_session_maker() as session:
-        result = await session.execute(select(User).where(User.username == "admin"))
-        existing = result.scalars().first()
-
-        if not existing:
-            admin_user = User(
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        await db.commit()
+        
+        return user
+    
+    @staticmethod
+    def generate_token(user: UserModel) -> str:
+        """Generate a JWT token for a user."""
+        payload = {
+            "sub": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+            "iat": datetime.utcnow()
+        }
+        return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    
+    @staticmethod
+    def verify_token(token: str) -> dict:
+        """Verify a JWT token and return the payload."""
+        try:
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            return payload
+        except jwt.ExpiredSignatureError:
+            return {"error": "Token expired"}
+        except jwt.InvalidTokenError:
+            return {"error": "Invalid token"}
+    
+    @staticmethod
+    async def seed_default_admin(db: AsyncSession) -> None:
+        """Seed a default admin user if none exists."""
+        admin = await AuthService.get_user_by_username(db, "admin")
+        if admin:
+            logger.info("[AUTH] Default admin user already exists")
+            return
+        
+        try:
+            admin = await AuthService.create_user(
+                db=db,
                 username="admin",
-                email="admin@sera.internal",
-                hashed_password=hash_password("AdminPass2026!"),
-                role="SUPER_ADMIN",
-                is_active=True
+                email="admin@sera.com",
+                password="admin123",
+                role="SUPER_ADMIN"
             )
-            session.add(admin_user)
-            await session.commit()
-            logger.info("[AUTH] Default admin user created: username='admin', password='AdminPass2026!'")
-        else:
-            logger.info("[AUTH] Admin user already exists.")
+            logger.info("[AUTH] Default admin user created: admin / admin123")
+        except ValueError as e:
+            logger.warning(f"[AUTH] Could not create admin: {e}")

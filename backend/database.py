@@ -60,12 +60,12 @@ async def verify_db_connection() -> None:
         except Exception as e:
             if attempt == max_retries:
                 logger.warning(f"[DATABASE] Could not verify DB connection: {e}. Starting anyway.")
-                return  # Don't crash — let FastAPI handle DB errors per-request
+                return
             logger.warning(
                 f"[DATABASE] Connection attempt {attempt}/{max_retries} failed. Retrying in {retry_delay}s... Error: {e}"
             )
             await asyncio.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2.0, 2.0)  # cap at 2 seconds
+            retry_delay = min(retry_delay * 2.0, 2.0)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
@@ -79,15 +79,52 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 async def init_db() -> None:
+    """Initialize database tables."""
     # Resilient check before creating tables
     try:
         await verify_db_connection()
     except Exception as e:
         logger.warning(f"[DATABASE] Remote DB check notice: {e}. Continuing with database initialization.")
-    from models.db_models import EntityModel, EventModel, AlertModel, PredictionModel, EntityRelationshipModel, ClaimModel, ClaimChallengeModel, TrackedQueryModel, CitationResultModel
-    from models.commerce import CompanyModel, FinancialMetricsModel, JobPostingsModel, SearchTrendsModel, VesselMovementsModel, NewsEventsModel, GitHubActivityModel, IngestionLogModel, TickerPriorityCacheModel, HealthcareMetric, ExecutiveMovement
+    
+    # ✅ FIXED: Import models with correct names from commerce.py
+    from models.db_models import (
+        EntityModel, 
+        EventModel, 
+        AlertModel, 
+        PredictionModel, 
+        EntityRelationshipModel, 
+        ClaimModel, 
+        ClaimChallengeModel, 
+        TrackedQueryModel, 
+        CitationResultModel
+    )
+    
+    # ✅ CRITICAL FIX: Use correct class names from commerce.py
+    from models.commerce import (
+        CompanyModel,
+        FinancialMetricsModel,    # ✅ Fixed: Added 's' at the end
+        JobPostingsModel,         # ✅ Fixed: Added 's' at the end
+        SearchTrendsModel,
+        VesselMovementsModel,
+        NewsEventsModel,
+        GitHubActivityModel,
+        IngestionLogModel,
+        TickerPriorityCacheModel,
+        HealthcareMetric,
+        ExecutiveMovement
+    )
+    
     from models.claims import TrackedQuery, Claim, Evidence, Challenge
-    from models.security import SecurityEngagement, SecurityFinding, EngagementPhaseLog
+    from models.security import (
+        SecurityEngagement, 
+        SecurityFinding, 
+        EngagementPhaseLog,
+        STYXDetection,
+        STYXNode,
+        STYXReport
+    )
+    from models.user import UserModel
+    from models.entities import ThreatActorModel, AssetModel
     
     # Run Table Schema Creation in a transaction block
     async with engine.begin() as conn:
@@ -116,3 +153,5 @@ async def init_db() -> None:
                 await conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}"))
         except Exception:
             pass
+
+    logger.info("[DATABASE] Database initialization complete.")

@@ -14,7 +14,7 @@ def _gen_uuid() -> str:
     return str(uuid.uuid4())
 
 
-class User(Base):
+class UserModel(Base):  # ✅ Changed from 'User' to 'UserModel'
     """Represents a system user (Admin, Operator, Analyst)."""
     __tablename__ = "users"
 

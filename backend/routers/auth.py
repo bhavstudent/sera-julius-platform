@@ -1,137 +1,139 @@
 """
-SERA Auth Router
-================
-REST endpoints for User Login, Profile, and RBAC Management.
-
-POST /api/auth/login    — Login and retrieve JWT token
-GET  /api/auth/me       — Retrieve current user profile
-GET  /api/auth/users    — List system users (Admin)
-POST /api/auth/users    — Create new user (Admin)
+Auth Router
+===========
+Authentication endpoints for user login, registration, and token management.
 """
 
-import logging
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Header
-from pydantic import BaseModel, Field
-from sqlalchemy import select
-from database import async_session_maker
-from models.user import User
-from services.auth_service import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    decode_access_token,
-)
+from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
-logger = logging.getLogger("sera.routers.auth")
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+from database import get_db
+from models.user import UserModel as User
+from services.auth_service import AuthService
+
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+security = HTTPBearer()
+
+
+# ─── Request/Response Models ──────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: str = "ANALYST"
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., description="Username or email")
-    password: str = Field(..., description="Password")
+    username: str
+    password: str
 
 
-class CreateUserRequest(BaseModel):
-    username: str = Field(...)
-    email: str = Field(...)
-    password: str = Field(...)
-    role: str = Field(default="ANALYST", description="SUPER_ADMIN | SECURITY_OPERATOR | ANALYST")
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    username: str
+    email: str
+    role: str
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
-    """Dependency to extract & verify user from Bearer Token header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header.")
-
-    token = authorization.split(" ")[1]
-    payload = decode_access_token(token)
-
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token expired or invalid.")
-
-    username = payload.get("sub")
-    async with async_session_maker() as session:
-        result = await session.execute(select(User).where(User.username == username))
-        user = result.scalars().first()
-
-        if not user or not user.is_active:
-            raise HTTPException(status_code=401, detail="User account is inactive or missing.")
-
-        return user
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
 
 
-@router.post("/login", summary="Admin & User Login")
-async def login(req: LoginRequest):
-    """Authenticate user credentials and issue a JWT token."""
-    async with async_session_maker() as session:
-        # Search by username or email
-        result = await session.execute(
-            select(User).where((User.username == req.username) | (User.email == req.username))
+# ─── Endpoints ─────────────────────────────────────────────────────────────
+
+@router.post("/register", response_model=UserResponse)
+async def register(
+    request: RegisterRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Register a new user."""
+    try:
+        user = await AuthService.create_user(
+            db=db,
+            username=request.username,
+            email=request.email,
+            password=request.password,
+            role=request.role
         )
-        user = result.scalars().first()
-
-        if not user or not verify_password(req.password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid username/email or password.")
-
-        if not user.is_active:
-            raise HTTPException(status_code=403, detail="Account is deactivated.")
-
-        # Update last login timestamp
-        user.last_login = datetime.utcnow()
-        await session.commit()
-
-        # Issue JWT token
-        token = create_access_token({"sub": user.username, "role": user.role, "id": user.id})
-
-        logger.info(f"[AUTH] Successful login for '{user.username}' ({user.role})")
-        return {
-            "token": token,
-            "token_type": "bearer",
-            "user": user.to_dict(),
-            "message": f"Welcome back, {user.username}!"
-        }
-
-
-@router.get("/me", summary="Get Current Authenticated Profile")
-async def get_profile(user: User = Depends(get_current_user)):
-    return {"user": user.to_dict()}
-
-
-@router.get("/users", summary="List All Users (Admin)")
-async def list_users(user: User = Depends(get_current_user)):
-    if user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="Super Admin role required.")
-
-    async with async_session_maker() as session:
-        result = await session.execute(select(User).order_by(User.created_at.desc()))
-        users = result.scalars().all()
-        return {"users": [u.to_dict() for u in users]}
-
-
-@router.post("/users", summary="Create User (Admin)")
-async def create_user(req: CreateUserRequest, user: User = Depends(get_current_user)):
-    if user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="Super Admin role required.")
-
-    async with async_session_maker() as session:
-        # Check duplicate
-        result = await session.execute(
-            select(User).where((User.username == req.username) | (User.email == req.email))
+        return UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at
         )
-        if result.scalars().first():
-            raise HTTPException(status_code=409, detail="Username or email already exists.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-        new_user = User(
-            username=req.username,
-            email=req.email,
-            hashed_password=hash_password(req.password),
-            role=req.role.upper(),
-            is_active=True
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    request: LoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Login and get JWT token."""
+    user = await AuthService.authenticate_user(db, request.username, request.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
         )
-        session.add(new_user)
-        await session.commit()
+    
+    token = AuthService.generate_token(user)
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role
+    )
 
-        logger.info(f"[AUTH] New user created: {new_user.username} ({new_user.role}) by {user.username}")
-        return {"user": new_user.to_dict(), "message": f"User {new_user.username} created successfully."}
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get current user from token."""
+    payload = AuthService.verify_token(credentials.credentials)
+    if "error" in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=payload["error"]
+        )
+    
+    user = await AuthService.get_user_by_username(db, payload.get("username"))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at
+    )
+
+
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Logout (client-side token discard)."""
+    return {"status": "success", "message": "Logged out successfully"}
