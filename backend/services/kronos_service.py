@@ -12,6 +12,8 @@ Capabilities:
 - Model checkpointing
 """
 
+from __future__ import annotations
+
 import logging
 try:
     import torch
@@ -19,8 +21,11 @@ try:
     TORCH_OK = True
 except ImportError:
     TORCH_OK = False
-    torch = None
-    nn = None
+    class _DummyNN:
+        Module = Any
+        Tensor = Any
+    nn = _DummyNN
+    torch = _DummyNN
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime

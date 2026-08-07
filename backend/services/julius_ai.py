@@ -16,6 +16,8 @@ Usage:
     scaled_model = ai.scale_model(your_model, target_params=1_000_000_000_000)
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import logging
@@ -29,8 +31,11 @@ try:
     TORCH_OK = True
 except ImportError:
     TORCH_OK = False
-    torch = None
-    nn = None
+    class _DummyNN:
+        Module = Any
+        Tensor = Any
+    nn = _DummyNN
+    torch = _DummyNN
     logger.warning("[JULIUS-AI] PyTorch not installed. Running in lightweight stub mode.")
 
 # ============================================================================
