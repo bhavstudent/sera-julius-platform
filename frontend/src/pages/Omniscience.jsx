@@ -6,23 +6,38 @@ const API_HEADERS = {
   'X-API-Key': 'sera-demo-2026'
 }
 
+const PROD_BACKEND_URL = 'https://sera-julius-intelligence-api.onrender.com'
+
 async function apiFetch(endpoint, options = {}) {
   const mergedOptions = {
     ...options,
     headers: { ...API_HEADERS, ...(options.headers || {}) }
   }
-  
-  // 1. Try relative path (Vite proxy)
-  try {
-    const res = await fetch(endpoint, mergedOptions)
-    if (res.ok) return res
-  } catch (e) {
-    console.warn(`Proxy fetch failed for ${endpoint}, retrying via direct backend URL...`, e)
+
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+
+  // 1. In Local Dev: try relative proxy first, fallback to http://localhost:8000
+  if (isLocal) {
+    try {
+      const res = await fetch(endpoint, mergedOptions)
+      const cType = res.headers.get('content-type') || ''
+      if (res.ok && cType.includes('application/json')) return res
+    } catch (e) {
+      console.warn(`Local proxy fetch failed for ${endpoint}, falling back to port 8000...`)
+    }
+    return await fetch(`http://localhost:8000${endpoint}`, mergedOptions)
   }
 
-  // 2. Direct backend URL fallback
-  const directUrl = `http://localhost:8000${endpoint}`
-  return await fetch(directUrl, mergedOptions)
+  // 2. In Production (Render): always hit production backend directly
+  const targetUrl = `${PROD_BACKEND_URL}${endpoint}`
+  try {
+    const res = await fetch(targetUrl, mergedOptions)
+    if (res.ok) return res
+  } catch (e) {
+    console.error(`Production fetch failed for ${targetUrl}:`, e)
+  }
+
+  return await fetch(targetUrl, mergedOptions)
 }
 
 function getDomain(url) {
@@ -63,10 +78,16 @@ export default function Omniscience() {
         apiFetch('/api/omniscience/perception'),
         apiFetch('/api/omniscience/evolution/logs')
       ])
-      if (resP.status === 'fulfilled' && resP.value.ok) setPerception(await resP.value.json())
-      if (resL.status === 'fulfilled' && resL.value.ok) {
-        const d = await resL.value.json()
-        setEvolutionLogs(d.logs || [])
+      if (resP.status === 'fulfilled' && resP.value && resP.value.ok) {
+        const cType = resP.value.headers.get('content-type') || ''
+        if (cType.includes('application/json')) setPerception(await resP.value.json())
+      }
+      if (resL.status === 'fulfilled' && resL.value && resL.value.ok) {
+        const cType = resL.value.headers.get('content-type') || ''
+        if (cType.includes('application/json')) {
+          const d = await resL.value.json()
+          setEvolutionLogs(d.logs || [])
+        }
       }
     } catch (err) {
       console.error('Omniscience telemetry load error:', err)
@@ -86,9 +107,14 @@ export default function Omniscience() {
         method: 'POST',
         body: JSON.stringify({ query: text })
       })
-      if (res.ok) {
-        const data = await res.json()
-        setRagResult(data)
+      if (res && res.ok) {
+        const cType = res.headers.get('content-type') || ''
+        if (cType.includes('application/json')) {
+          const data = await res.json()
+          setRagResult(data)
+        } else {
+          console.error('Expected JSON response but received non-JSON:', await res.text())
+        }
       }
     } catch (err) {
       console.error('Search failed:', err)
@@ -111,7 +137,7 @@ export default function Omniscience() {
           knowledge_graph: ragResult.knowledge_graph || {}
         })
       })
-      if (res.ok) {
+      if (res && res.ok) {
         const blob = await res.blob()
         const a = document.createElement('a')
         a.href = window.URL.createObjectURL(blob)

@@ -1,6 +1,9 @@
 import requests
+import os
 
 API_KEY = "rnd_lzrQQC9txS3lRO5ZLkd2X3psBrjB"
+SERVICE_ID = "srv-d9m6cm95efls73ck2jf0"
+
 headers = {
     "Accept": "application/json",
     "Content-Type": "application/json",
@@ -11,15 +14,19 @@ patch_payload = {
     "rootDir": "backend",
     "serviceDetails": {
         "envSpecificDetails": {
-            "buildCommand": "pip install -r requirements.txt",
+            "buildCommand": "pip install -r requirements-lite.txt",
             "startCommand": 'sh -c "uvicorn main:app --host 0.0.0.0 --port $PORT"'
         }
     }
 }
 
-r = requests.patch("https://api.render.com/v1/services/srv-d9kotttbedkc73b632ig", json=patch_payload, headers=headers)
+r = requests.patch(f"https://api.render.com/v1/services/{SERVICE_ID}", json=patch_payload, headers=headers)
 print("PATCH STATUS:", r.status_code)
-print("PATCH RESP:", r.json())
+if r.status_code == 200:
+    print("PATCH SUCCESS:", r.json().get("name"))
+else:
+    print("PATCH ERROR:", r.text[:300])
 
-d = requests.post("https://api.render.com/v1/services/srv-d9kotttbedkc73b632ig/deploys", headers=headers)
+d = requests.post(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys", headers=headers)
+print("DEPLOY STATUS:", d.status_code)
 print("NEW DEPLOY ID:", d.json().get("id"))

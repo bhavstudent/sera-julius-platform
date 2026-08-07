@@ -15,9 +15,10 @@ export default function ThreatAlertBanner() {
   useEffect(() => {
     if (muted) return
 
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const wsUrl = `${protocol}//${host}/api/security/ws/threats?api_key=sera-demo-2026`
+    const wsHost = isLocal ? window.location.host : 'sera-julius-intelligence-api.onrender.com'
+    const wsUrl = `${protocol}//${wsHost}/api/security/ws/threats?api_key=sera-demo-2026`
 
     let socket
     try {
@@ -28,15 +29,12 @@ export default function ThreatAlertBanner() {
           const msg = JSON.parse(event.data)
           if (msg.type === 'threat_alert' && msg.data) {
             const data = msg.data
-            // Unique key by IP + Title to identify unique threats like an email subject
             const threatKey = `${data.ip || ''}_${data.title || ''}`.trim()
 
-            // If user has already dismissed or marked this threat as read, DO NOT pop up again
             if (dismissedKeys.has(threatKey)) {
               return
             }
 
-            // Set single active threat notification (Email Preview Style)
             setActiveThreat({
               key: threatKey,
               id: Date.now(),
@@ -57,7 +55,6 @@ export default function ThreatAlertBanner() {
     }
   }, [muted, dismissedKeys])
 
-  // Mark as Read & Stop Future Popups for this threat
   const handleMarkAsRead = () => {
     if (!activeThreat) return
     const keyToDismiss = activeThreat.key
@@ -72,7 +69,6 @@ export default function ThreatAlertBanner() {
     setActiveThreat(null)
   }
 
-  // Toggle Mute All Popups
   const toggleMute = () => {
     const nextMute = !muted
     setMuted(nextMute)
@@ -103,13 +99,12 @@ export default function ThreatAlertBanner() {
         overflow: 'hidden',
         color: '#ffffff'
       }}>
-        {/* Email Header Bar */}
         <div style={{
           background: 'rgba(255, 42, 32, 0.12)',
           padding: '10px 14px',
           borderBottom: '1px solid rgba(255, 42, 32, 0.25)',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '11px',
           fontFamily: 'monospace'
@@ -141,7 +136,6 @@ export default function ThreatAlertBanner() {
           </div>
         </div>
 
-        {/* Notification Body */}
         <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px' }}>
             <span style={{ color: activeThreat.severity === 'CRITICAL' ? '#ff2a20' : '#ffb340' }}>
@@ -167,7 +161,6 @@ export default function ThreatAlertBanner() {
               </span>
             )}
 
-            {/* Email-Style Action Button: Mark Read & Stop Popups */}
             <button
               onClick={handleMarkAsRead}
               style={{

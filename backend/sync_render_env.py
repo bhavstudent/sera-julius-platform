@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv("RENDER_API_KEY", "rnd_lzrQQC9txS3lRO5ZLkd2X3psBrjB")
-SERVICE_ID = "srv-d9kotttbedkc73b632ig"
+API_KEY = os.getenv("RENDER_API_KEY", "")
+SERVICE_ID = "srv-d9m6cm95efls73ck2jf0"
 
 headers = {
     "Accept": "application/json",
@@ -37,5 +37,8 @@ env_vars = [
     {"key": "EXEC_INTERVAL_MINUTES", "value": "60"}
 ]
 
-r = requests.put(f"https://api.render.com/v1/services/{SERVICE_ID}/env-vars", json=env_vars, headers=headers)
-print("ENV VARS SYNC HTTP STATUS:", r.status_code)
+if API_KEY:
+    r = requests.put(f"https://api.render.com/v1/services/{SERVICE_ID}/env-vars", json=env_vars, headers=headers)
+    print("ENV VARS SYNC HTTP STATUS:", r.status_code)
+else:
+    print("No RENDER_API_KEY provided.")
