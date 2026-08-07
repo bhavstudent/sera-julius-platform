@@ -18,12 +18,20 @@ Usage:
 
 import sys
 import os
-import torch
-import torch.nn as nn
 import logging
 from typing import Dict, List, Tuple, Optional, Any
 
 logger = logging.getLogger("sera.julius_ai")
+
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_OK = True
+except ImportError:
+    TORCH_OK = False
+    torch = None
+    nn = None
+    logger.warning("[JULIUS-AI] PyTorch not installed. Running in lightweight stub mode.")
 
 # ============================================================================
 # SERA PATH IMPORTS

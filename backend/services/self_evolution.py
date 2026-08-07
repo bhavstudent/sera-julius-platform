@@ -11,7 +11,12 @@ Autonomous self-improvement system that:
 
 import logging
 import json
-import torch
+try:
+    import torch
+    TORCH_OK = True
+except ImportError:
+    TORCH_OK = False
+    torch = None
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple

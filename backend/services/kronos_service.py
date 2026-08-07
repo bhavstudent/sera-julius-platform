@@ -13,8 +13,14 @@ Capabilities:
 """
 
 import logging
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_OK = True
+except ImportError:
+    TORCH_OK = False
+    torch = None
+    nn = None
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime

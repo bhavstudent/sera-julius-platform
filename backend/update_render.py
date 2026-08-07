@@ -1,5 +1,4 @@
 import requests
-import os
 
 API_KEY = "rnd_lzrQQC9txS3lRO5ZLkd2X3psBrjB"
 SERVICE_ID = "srv-d9m6cm95efls73ck2jf0"
@@ -24,9 +23,8 @@ r = requests.patch(f"https://api.render.com/v1/services/{SERVICE_ID}", json=patc
 print("PATCH STATUS:", r.status_code)
 if r.status_code == 200:
     print("PATCH SUCCESS:", r.json().get("name"))
-else:
-    print("PATCH ERROR:", r.text[:300])
 
 d = requests.post(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys", headers=headers)
 print("DEPLOY STATUS:", d.status_code)
-print("NEW DEPLOY ID:", d.json().get("id"))
+if d.status_code == 201:
+    print("NEW DEPLOY ID:", d.json().get("id"))
