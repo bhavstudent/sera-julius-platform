@@ -12,6 +12,7 @@ headers = {
 patch_payload = {
     "rootDir": "backend",
     "serviceDetails": {
+        "healthCheckPath": "/health",
         "envSpecificDetails": {
             "buildCommand": "pip install -r requirements-lite.txt",
             "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"

@@ -127,20 +127,19 @@ async def init_db() -> None:
     from models.user import UserModel
     from models.entities import ThreatActorModel, AssetModel
     
-    # Run Table Schema Creation in a transaction block
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Run Table Schema Creation in a transaction block safely
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        logger.warning(f"[DATABASE] Schema creation notice: {e}")
         
     # Run Alter table modifications gracefully
     try:
         async with engine.begin() as conn:
             await conn.execute(text("ALTER TABLE news_events ADD COLUMN IF NOT EXISTS tickers TEXT"))
     except Exception:
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE news_events ADD COLUMN tickers TEXT"))
-        except Exception:
-            pass
+        pass
 
     # Sentiment columns migration for companies table
     for col_name, col_type in [
