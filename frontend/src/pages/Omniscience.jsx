@@ -6,7 +6,7 @@ const API_HEADERS = {
   'X-API-Key': 'sera-demo-2026'
 }
 
-const PROD_BACKEND_URL = 'https://sera-julius-intelligence-api.onrender.com'
+const PROD_BACKEND_URL = 'https://sera-julius-platform-backend.onrender.com'
 
 async function apiFetch(endpoint, options = {}) {
   const mergedOptions = {
@@ -579,3 +579,4 @@ export default function Omniscience() {
     </div>
   )
 }
+

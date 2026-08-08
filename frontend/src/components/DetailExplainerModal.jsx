@@ -127,3 +127,4 @@ export default function DetailExplainerModal({ isOpen, onClose, data }) {
     </div>
   )
 }
+

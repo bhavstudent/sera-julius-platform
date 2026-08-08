@@ -17,7 +17,7 @@ export default function ThreatAlertBanner() {
 
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsHost = isLocal ? window.location.host : 'sera-julius-intelligence-api.onrender.com'
+    const wsHost = isLocal ? window.location.host : 'sera-julius-platform-backend.onrender.com'
     const wsUrl = `${protocol}//${wsHost}/api/security/ws/threats?api_key=sera-demo-2026`
 
     let socket
@@ -184,3 +184,4 @@ export default function ThreatAlertBanner() {
     </div>
   )
 }
+

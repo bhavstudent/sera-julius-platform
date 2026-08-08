@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || 'https://sera-julius-intelligence-api.onrender.com'
+const BASE = import.meta.env.VITE_API_BASE || 'https://sera-julius-platform-backend.onrender.com'
 const API_KEY = import.meta.env.VITE_API_KEY ?? 'sera-demo-2026'
 
 const AUTH_HEADERS = {

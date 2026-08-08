@@ -41,7 +41,7 @@ export default function TacticalRadar3D() {
   useEffect(() => {
     const fetchTargets = async () => {
       try {
-        const res = await fetch('https://sera-julius-intelligence-api.onrender.com/api/security/radar-targets', {
+        const res = await fetch('https://sera-julius-platform-backend.onrender.com/api/security/radar-targets', {
           headers: { 'X-API-Key': 'sera-demo-2026' }
         })
         if (res.ok) {
@@ -170,7 +170,7 @@ export default function TacticalRadar3D() {
     const targetQuery = searchIp.trim()
 
     try {
-      const res = await fetch(`https://sera-julius-intelligence-api.onrender.com/api/security/ip-geo/${encodeURIComponent(targetQuery)}`, {
+      const res = await fetch(`https://sera-julius-platform-backend.onrender.com/api/security/ip-geo/${encodeURIComponent(targetQuery)}`, {
         headers: { 'X-API-Key': 'sera-demo-2026' }
       })
       if (res.ok) {
@@ -516,3 +516,4 @@ export default function TacticalRadar3D() {
     </div>
   )
 }
+

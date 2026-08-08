@@ -208,3 +208,4 @@ export default function BlockInspectorModal({ blockData, onClose }) {
     </div>
   )
 }
+

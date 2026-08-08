@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { fetchEntities, submitClaim, fetchClaim, submitChallenge, reaffirmClaim } from '../api/client'
 import GlassCard from '../components/GlassCard'
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'https://sera-julius-intelligence-api.onrender.com'
+const BASE = import.meta.env.VITE_API_BASE_URL || 'https://sera-julius-platform-backend.onrender.com'
 const AUTH_HEADERS = { 'Content-Type': 'application/json', 'X-API-Key': 'sera-demo-2026' }
 
 async function fetchRecentClaims() {
@@ -546,3 +546,4 @@ export default function ClaimCredibility() {
     </div>
   )
 }
+

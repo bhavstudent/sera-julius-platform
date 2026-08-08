@@ -40,3 +40,4 @@ export default function AnimatedCounter({ value, duration = 1200 }) {
 
   return <span>{typeof displayValue === 'number' ? displayValue.toLocaleString() : displayValue}</span>
 }
+

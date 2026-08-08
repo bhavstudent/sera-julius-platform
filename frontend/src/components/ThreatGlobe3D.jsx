@@ -270,3 +270,4 @@ export default function ThreatGlobe3D({ height = '520px' }) {
     </div>
   )
 }
+

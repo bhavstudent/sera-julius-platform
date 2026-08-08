@@ -69,3 +69,4 @@ export default function ForceGraph({ data, width = 560, height = 400 }) {
         </svg>
     )
 }
+

@@ -183,8 +183,8 @@ export default function CausalGraph() {
     const pollRealtimeBackend = async () => {
       try {
         const [compRes, radarRes] = await Promise.all([
-          fetch('https://sera-julius-intelligence-api.onrender.com/api/semantic/companies', { headers: { 'X-API-Key': 'sera-demo-2026' } }),
-          fetch('https://sera-julius-intelligence-api.onrender.com/api/security/radar-targets', { headers: { 'X-API-Key': 'sera-demo-2026' } })
+          fetch('https://sera-julius-platform-backend.onrender.com/api/semantic/companies', { headers: { 'X-API-Key': 'sera-demo-2026' } }),
+          fetch('https://sera-julius-platform-backend.onrender.com/api/security/radar-targets', { headers: { 'X-API-Key': 'sera-demo-2026' } })
         ]);
 
         if (compRes.ok) {
@@ -246,7 +246,7 @@ export default function CausalGraph() {
 
     let outgoing = [];
     try {
-      const res  = await fetch(`https://sera-julius-intelligence-api.onrender.com/api/semantic/outgoing/${node.id}`, {
+      const res  = await fetch(`https://sera-julius-platform-backend.onrender.com/api/semantic/outgoing/${node.id}`, {
         headers: { 'X-API-Key': 'sera-demo-2026', 'Content-Type': 'application/json' }
       });
       if (res.ok) {
@@ -774,3 +774,4 @@ export default function CausalGraph() {
     </div>
   );
 }
+
