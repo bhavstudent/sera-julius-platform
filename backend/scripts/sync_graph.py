@@ -2,7 +2,12 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
-from neo4j import GraphDatabase
+try:
+    from neo4j import GraphDatabase
+    NEO4J_OK = True
+except ImportError:
+    GraphDatabase = None
+    NEO4J_OK = False
 
 # Set path so we can import from backend
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

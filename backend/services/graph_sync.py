@@ -2,12 +2,18 @@ import logging
 import unicodedata
 import re
 from sqlalchemy import select
-from neo4j import GraphDatabase
 from database import async_session_maker
 from models.commerce import (
     CompanyModel, NewsEventsModel, JobPostingsModel, VesselMovementsModel
 )
 from config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+
+try:
+    from neo4j import GraphDatabase
+    NEO4J_OK = True
+except ImportError:
+    GraphDatabase = None
+    NEO4J_OK = False
 
 logger = logging.getLogger("sera.graph_sync")
 
@@ -32,6 +38,9 @@ class GraphSyncService:
     @classmethod
     def get_driver(cls):
         """Initializes and returns the Neo4j Bolt driver driver instance."""
+        if not NEO4J_OK or GraphDatabase is None:
+            logger.warning("[NEO4J] neo4j package not installed. Graph sync disabled.")
+            return None
         if not cls._driver:
             if not NEO4J_URI or not NEO4J_PASSWORD:
                 logger.error("Neo4j environment configurations (NEO4J_URI, NEO4J_PASSWORD) are missing.")
