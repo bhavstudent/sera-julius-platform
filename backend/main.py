@@ -626,6 +626,15 @@ async def startup():
         except Exception as e:
             logger.warning(f"[STARTUP] Warning: Failed to warm up SentenceTransformer: {e}")
 
+        # 6. Seed default Admin User
+        try:
+            from services.auth_service import AuthService
+            from database import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await AuthService.seed_default_admin(session)
+        except Exception as e:
+            logger.error(f"[STARTUP] Failed to seed default admin user: {e}")
+
     # Fire all heavy work as a background task — returns immediately so health check passes
     asyncio.create_task(_background_init())
 
@@ -720,15 +729,6 @@ async def startup():
         logger.info("[STARTUP] Real-time threat broadcast loop started.")
     except Exception as e:
         logger.error(f"[STARTUP] Failed to start threat broadcast loop: {e}")
-
-    # Seed default Admin User
-    try:
-        from services.auth_service import AuthService
-        from database import AsyncSessionLocal
-        async with AsyncSessionLocal() as session:
-            await AuthService.seed_default_admin(session)
-    except Exception as e:
-        logger.error(f"[STARTUP] Failed to seed default admin user: {e}")
 
     # ─── EXTERNAL NETWORK SCANNER ────────────────────────────────────
     if os.getenv("EXTERNAL_SCANNER_ENABLED", "false").lower() == "true":

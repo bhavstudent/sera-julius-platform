@@ -1,7 +1,7 @@
 import requests
 
 API_KEY = "rnd_lzrQQC9txS3lRO5ZLkd2X3psBrjB"
-SERVICE_ID = "srv-d9m6cm95efls73ck2jf0"
+SERVICE_ID = "srv-d9rdcbijnfac73ff9d7g"
 
 headers = {
     "Accept": "application/json",
@@ -15,7 +15,7 @@ patch_payload = {
         "healthCheckPath": "/health",
         "envSpecificDetails": {
             "buildCommand": "pip install -r requirements-lite.txt",
-            "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+            "startCommand": "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
         }
     }
 }
