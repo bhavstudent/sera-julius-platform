@@ -2,6 +2,9 @@
 # SERA Platform Main Entry Point - WITH SPYWARE/MONITORING ROUTERS
 # ============================================================================
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 # ✅ FIXED: Add missing imports
 from typing import Optional, Dict, Any, List
 
