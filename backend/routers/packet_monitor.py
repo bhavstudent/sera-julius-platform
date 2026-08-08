@@ -10,7 +10,7 @@ from services.monitoring.packet_sniffer import (
     get_packet_stats,
     get_packet_detections
 )
-from security.auth import get_current_user
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/packet-monitor", tags=["Packet Monitor"])
 
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/packet-monitor", tags=["Packet Monitor"])
 async def start_monitor(interface: str = "eth0", current_user = Depends(get_current_user)):
     """Start packet monitoring"""
     result = start_packet_monitor(interface)
-    if result["status"] == "error":
-        raise HTTPException(status_code=500, detail=result["message"])
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("message"))
     return result
 
 @router.post("/stop")
@@ -29,10 +29,10 @@ async def stop_monitor(current_user = Depends(get_current_user)):
 
 @router.get("/stats")
 async def get_stats(current_user = Depends(get_current_user)):
-    """Get monitoring statistics"""
+    """Get packet monitor stats"""
     return get_packet_stats()
 
 @router.get("/detections")
-async def get_detections(limit: int = 100, current_user = Depends(get_current_user)):
-    """Get detections"""
+async def get_detections(limit: int = 20, current_user = Depends(get_current_user)):
+    """Get packet detections"""
     return get_packet_detections(limit)

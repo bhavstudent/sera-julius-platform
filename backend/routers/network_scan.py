@@ -2,6 +2,7 @@
 Network Scanner API for Sera
 """
 
+import sys
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from services.monitoring.network_scanner import (
@@ -9,7 +10,7 @@ from services.monitoring.network_scanner import (
     get_scan_status,
     get_scan_results
 )
-from security.auth import get_current_user
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/network-scan", tags=["Network Scanner"])
 
