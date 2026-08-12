@@ -233,7 +233,7 @@ torpy>=1.0.0
 # nmapthon2>=1.6.0
 
 # For Windows process manipulation
-pywin32>=306
+# pywin32>=306
 
 # For Windows registry access
 # winreg is built-in on Windows
