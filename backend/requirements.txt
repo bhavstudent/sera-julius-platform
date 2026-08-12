@@ -1,5 +1,5 @@
 # ============================================================
-# SERA Platform - Production Dependencies (FIXED - COMPLETE)
+# SERA Platform - Production Dependencies (FIXED)
 # ============================================================
 # Python 3.10+ required
 # Install with: pip install -r requirements.txt
@@ -15,7 +15,7 @@ pydantic>=2.9.0
 python-dotenv>=1.0.1
 python-multipart>=0.0.9
 pyyaml>=6.0.1
-reportlab==4.2.5
+reportlab>=4.0.0
 
 # ============================================================
 # ASYNCHRONOUS & CONCURRENCY
@@ -24,7 +24,6 @@ reportlab==4.2.5
 httpx>=0.27.0
 aiohttp>=3.9.0
 websockets>=13.0
-# asyncio is built-in, no need to install
 
 # ============================================================
 # DATABASES
@@ -113,16 +112,16 @@ slowapi>=0.1.9
 apscheduler>=3.10.0
 
 # ============================================================
-# ⚠️ NETWORKING & SYSTEM (SPYWARE/MONITORING CAPABILITIES)
+# ✅ NETWORKING & SYSTEM (HACKING/SPYWARE)
 # ============================================================
 
-# Network packet manipulation (authorized use only)
+# Network packet manipulation
 scapy>=2.5.0
 
-# SSH connections for remote operations (authorized use only)
+# SSH connections for remote operations
 paramiko>=3.3.1
 
-# Interactive session management for shell (authorized use only)
+# Interactive session management for shell
 pexpect>=4.8.0
 
 # IP address manipulation
@@ -131,25 +130,113 @@ ipaddress>=1.0.23
 # Docker API client
 docker>=6.1.3
 
-# DNS Spoofing & MITM (authorized use only)
-mitmproxy>=12.0.0
+# DNS Spoofing & MITM
+mitmproxy>=10.4.0
 
-# Dark Web / Tor (authorized use only)
+# Dark Web / Tor
 stem>=1.8.0
 
 # SOCKS5 Proxy (Tor connections)
 pysocks>=1.7.0
 
-# Windows Remote Operations (authorized use only)
+# Windows Remote Operations
 pywinrm>=0.4.0
 
 # ============================================================
-# ALTERNATIVE NETWORK SCANNING (WINDOWS COMPATIBLE)
+# ✅ WEB EXPLOITATION
 # ============================================================
 
-# For network scanning (alternative to python-nmap)
-netifaces>=0.11.0
-ping3>=4.0.4
+selenium>=4.20.0
+playwright>=1.40.0
+
+# ============================================================
+# ✅ ADVANCED EXPLOIT (OPTIONAL - Some may fail on Windows)
+# ============================================================
+
+# pwntools - May require additional setup on Windows
+# Install separately if needed: pip install pwntools
+# pwntools>=4.12.0
+
+# capstone - May require Visual C++ Redistributable
+# capstone>=5.0.0
+
+# keystone-engine - May require Visual C++ Redistributable
+# keystone-engine>=0.9.2
+
+# unicorn - May require Visual C++ Redistributable
+# unicorn>=2.0.0
+
+# ============================================================
+# ✅ NETWORK SCANNING & RECONNAISSANCE
+# ============================================================
+
+# Network scanning
+python-nmap>=0.7.1
+
+# Banner grabbing
+python-masscan>=0.2.0
+
+# DNS enumeration
+dnspython>=2.6.0
+
+# WHOIS
+python-whois>=0.8.0
+
+# ============================================================
+# ✅ OSINT & INTELLIGENCE GATHERING
+# ============================================================
+
+# Search engines
+googlesearch-python>=1.2.0
+shodan>=1.31.0
+
+# Social media (install separately if needed)
+# twint - May not work on Windows, install separately
+# telethon - For Telegram API
+
+# Email OSINT
+# hunterio>=1.0.0
+
+# Leak detection
+# haveibeenpwned>=0.1.0
+
+# ============================================================
+# ✅ CRYPTO & FINANCIAL
+# ============================================================
+
+# Blockchain
+web3>=6.0.0
+eth-account>=0.10.0
+# bitcoinlib>=0.12.0
+
+# Monero
+# monero-python>=1.0.0
+
+# ============================================================
+# ✅ DARK WEB & ANONYMITY
+# ============================================================
+
+# Tor integration
+torpy>=1.0.0
+
+# Mixnet
+# nym-sdk>=0.2.0
+
+# Post-quantum crypto
+# liboqs-python>=0.9.0
+
+# ============================================================
+# ✅ WINDOWS-SPECIFIC COMPATIBILITY
+# ============================================================
+
+# For Windows network scanning alternatives
+# nmapthon2>=1.6.0
+
+# For Windows process manipulation
+pywin32>=306
+
+# For Windows registry access
+# winreg is built-in on Windows
 
 # ============================================================
 # ADDITIONAL MONITORING DEPENDENCIES
@@ -195,51 +282,29 @@ ujson>=5.8.0
 # RAG & VECTOR DATABASES
 # ============================================================
 
-chromadb>=0.4.0  # Vector database for RAG
-faiss-cpu>=1.7.4  # Vector similarity search
+chromadb>=0.4.0
+faiss-cpu>=1.7.4
 
 # ============================================================
 # DEPLOYMENT & INFRASTRUCTURE
 # ============================================================
 
-gunicorn>=21.2.0  # Production WSGI server
-uvloop>=0.19.0  # Fast event loop for uvicorn
-httptools>=0.6.0  # HTTP parser for uvicorn
-
-# ============================================================
-# WINDOWS-SPECIFIC COMPATIBILITY FIXES
-# ============================================================
-
-# For Windows compatibility with scapy
-# scapy works on Windows but requires Npcap
-# Download Npcap from: https://npcap.com/
-# Make sure to install in "WinPcap API-compatible Mode"
+gunicorn>=21.2.0
+uvloop>=0.19.0
+httptools>=0.6.0
 
 # ============================================================
 # INSTALLATION NOTES
 # ============================================================
 # 
-# ⚠️ If you get an error with pexpect on Windows, install:
-# pip install pexpect
+# ⚠️ WINDOWS USERS:
+#   - Install Npcap from: https://npcap.com/
+#   - Install Tor from: https://www.torproject.org/
+#   - For pwntools, install Visual C++ Redistributable
 # 
-# ⚠️ If you get an error with python-nmap:
-# It's not recommended for Windows. Use:
-# 1. Install nmap from: https://nmap.org/download.html
-# 2. Add nmap to PATH
-# 
-# ⚠️ If you get an error with pcapy:
-# pcapy is not compatible with Python 3.13+
-# Use scapy instead (already installed)
-# 
-# ⚠️ For DNS spoofing:
-# 1. Install mitmproxy (included)
-# 2. Run as Administrator
-# 
-# ⚠️ For Dark Web:
-# 1. Install Tor from: https://www.torproject.org/
-# 2. Run Tor service
-# 
-# For Windows network scanning alternatives:
-# pip install nmapthon2  # Alternative to python-nmap
+# ⚠️ IF A PACKAGE FAILS TO INSTALL:
+#   - Comment it out (add # at start of line)
+#   - Run pip install again
+#   - Install failed packages manually
 # 
 # ============================================================
