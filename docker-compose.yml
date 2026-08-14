@@ -141,6 +141,16 @@ services:
       <<: *healthcheck-defaults
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
 
+  # ---------- FRONTEND UI (React 18 Dashboard) ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sera-frontend
+    networks:
+      - sera-net
+    restart: unless-stopped
+
   # ---------- NGINX (Load Balancer & TLS Terminator) ----------
   nginx:
     image: nginx:alpine
@@ -153,12 +163,13 @@ services:
       - ./ssl:/etc/nginx/ssl:ro   # Optional: mount certificates
     depends_on:
       - backend
+      - frontend
     networks:
       - sera-net
     restart: unless-stopped
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
 
 # ---------- VOLUMES ----------
 volumes:
