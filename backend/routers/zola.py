@@ -1330,3 +1330,4 @@ async def generate_bulk_predictions(entity_ids: List[str] = Body(...)) -> List[D
 # ======================================================================
 
 logger.info("[ZOLA] ZOLA router initialized")
+

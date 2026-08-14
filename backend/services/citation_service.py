@@ -161,3 +161,4 @@ class CitationService:
             logger.error(f"Error getting tracked queries: {e}", exc_info=True)
 
         return results
+

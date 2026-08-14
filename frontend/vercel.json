@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://sera-julius-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/ws",
+      "destination": "https://sera-julius-backend.onrender.com/ws"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

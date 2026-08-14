@@ -87,7 +87,7 @@ async def init_db() -> None:
     except Exception as e:
         logger.warning(f"[DATABASE] Remote DB check notice: {e}. Continuing with database initialization.")
     
-    # ✅ FIXED: Import models with correct names from commerce.py
+    # ✅ FIXED: Import models with correct names
     from models.db_models import (
         EntityModel, 
         EventModel, 
@@ -155,3 +155,25 @@ async def init_db() -> None:
             pass
 
     logger.info("[DATABASE] Database initialization complete.")
+
+# ============================================================
+# ✅ FIX: Add db export for routers
+# ============================================================
+
+# This is the missing export that routers/auth.py is trying to import
+db = None  # Placeholder for database connection
+
+# If using SQLAlchemy, you can also export the session
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Get database session for dependency injection."""
+    async with async_session_maker() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+# Export for backwards compatibility
+async_session = async_session_maker

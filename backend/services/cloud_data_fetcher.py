@@ -294,3 +294,4 @@ class CloudDataFetcher:
                 
         logger.info(f"Cloud Ingestion Pipeline finished successfully. Ingested {record_count} companies.")
         return record_count
+

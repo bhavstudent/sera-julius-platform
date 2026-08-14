@@ -51,6 +51,13 @@ from routers import (
     terminal,           # Linux terminal/shell execution
     darkweb,            # Dark web OSINT
     node_control,       # Remote node control
+    # ✅ NEW: Hacking Routers
+    exploit,            # Exploit framework
+    scanner,            # Network scanner
+    intel_pipeline,     # Intelligence pipeline
+    osint,              # OSINT collection
+    intelligence,       # Intelligence engine
+    events,             # Events tracking
 )
 
 # ✅ FIXED: Import geo_router from citation
@@ -284,7 +291,7 @@ app.include_router(graph.router)
 app.include_router(semantic.router)
 app.include_router(dark_intel.router)
 app.include_router(citation.router)
-app.include_router(geo_router)  # ✅ FIXED: Added geo_router
+app.include_router(geo_router)
 app.include_router(healthcare.router)
 app.include_router(executive.router)
 app.include_router(security_router.router)
@@ -309,6 +316,34 @@ logger.info("[ROUTERS] Dark Web router registered at /api/darkweb")
 # --- Node Control ---
 app.include_router(node_control.router)
 logger.info("[ROUTERS] Node Control router registered at /api/nodes")
+
+# ============================================================================
+# ✅ NEW: HACKING ROUTERS REGISTRATION
+# ============================================================================
+
+# --- Exploit Framework ---
+app.include_router(exploit.router, prefix="/api/v1/exploit", tags=["Hacking"])
+logger.info("[ROUTERS] Exploit router registered at /api/v1/exploit")
+
+# --- Network Scanner ---
+app.include_router(scanner.router, prefix="/api/v1/scanner", tags=["Hacking"])
+logger.info("[ROUTERS] Scanner router registered at /api/v1/scanner")
+
+# --- Intelligence Pipeline ---
+app.include_router(intel_pipeline.router, prefix="/api/v1/intel", tags=["Intelligence"])
+logger.info("[ROUTERS] Intel Pipeline router registered at /api/v1/intel")
+
+# --- OSINT ---
+app.include_router(osint.router, prefix="/api/v1/osint", tags=["OSINT"])
+logger.info("[ROUTERS] OSINT router registered at /api/v1/osint")
+
+# --- Intelligence ---
+app.include_router(intelligence.router, prefix="/api/v1/intelligence", tags=["Intelligence"])
+logger.info("[ROUTERS] Intelligence router registered at /api/v1/intelligence")
+
+# --- Events ---
+app.include_router(events.router, prefix="/api/v1/events", tags=["Events"])
+logger.info("[ROUTERS] Events router registered at /api/v1/events")
 
 # ============================================================================
 # ADDITIONAL SPYWARE/MONITORING API ENDPOINTS (Direct)

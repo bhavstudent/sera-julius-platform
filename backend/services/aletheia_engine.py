@@ -126,3 +126,4 @@ def compute_final_score(
             "apex_verified": apex_verified,
         }
     }
+

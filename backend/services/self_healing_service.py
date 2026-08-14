@@ -80,3 +80,4 @@ class SelfHealingAgent:
             )
 
 self_healing_agent = SelfHealingAgent()
+

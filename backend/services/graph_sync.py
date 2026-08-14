@@ -202,3 +202,4 @@ class GraphSyncService:
             "vessels": vessels_synced,
             "relationships": relations_created
         }
+

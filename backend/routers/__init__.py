@@ -1,54 +1,102 @@
 """
-Routers Package
-===============
-REST & WebSocket API Controllers.
-
-Available routers:
-    - auth: Authentication endpoints
-    - security: Security assessment endpoints
-    - zola: Threat prediction endpoints
-    - axiom: Engine diagnostics endpoints
-    - entities: Asset management endpoints
-    - chat: AI assistant endpoints
-    - and 12+ more...
+Routers Package - SERA Platform API Endpoints
 """
-
-from .auth import router as auth_router
-from .security import router as security_router
-from .zola import router as zola_router
-from .axiom import router as axiom_router
-from .entities import router as entities_router
-from .chat import router as chat_router
-from .dashboard import router as dashboard_router
-from .health import router as health_router
-from .stream import router as stream_router
-from .dark_intel import router as dark_intel_router
-from .citation import router as citation_router
-from .graph import router as graph_router
-from .semantic import router as semantic_router
-from .insights import router as insights_router
-from .executive import router as executive_router
-from .healthcare import router as healthcare_router
-from .censys import router as censys_router
-from .omniscience import router as omniscience_router
-
+# Core Routers
+from . import auth
+from . import health
+from . import dashboard
+from . import entities
+from . import graph
+from . import semantic
+from . import axiom
+from . import zola
+from . import chat
+from . import stream
+from . import intel
+from . import insights
+from . import citation
+from . import healthcare
+from . import executive
+from . import security
+from . import censys
+from . import omniscience
+from . import self_improvement
+# Hacking Routers (graceful fallback)
+try:
+    from . import terminal
+except ImportError:
+    terminal = None
+try:
+    from . import darkweb
+except ImportError:
+    darkweb = None
+try:
+    from . import node_control
+except ImportError:
+    node_control = None
+try:
+    from . import exploit
+except ImportError:
+    exploit = None
+try:
+    from . import scanner
+except ImportError:
+    scanner = None
+try:
+    from . import intel_pipeline
+except ImportError:
+    intel_pipeline = None
+try:
+    from . import osint
+except ImportError:
+    osint = None
+try:
+    from . import intelligence
+except ImportError:
+    intelligence = None
+try:
+    from . import events
+except ImportError:
+    events = None
+try:
+    from . import network
+except ImportError:
+    network = None
+try:
+    from . import live
+except ImportError:
+    live = None
+try:
+    from . import lan
+except ImportError:
+    lan = None
+try:
+    from . import apex
+except ImportError:
+    apex = None
+try:
+    from . import causal_functor
+except ImportError:
+    causal_functor = None
+try:
+    from . import kronos
+except ImportError:
+    kronos = None
+try:
+    from . import stratum
+except ImportError:
+    stratum = None
+try:
+    from . import pantheon
+except ImportError:
+    pantheon = None
 __all__ = [
-    'auth_router',
-    'security_router',
-    'zola_router',
-    'axiom_router',
-    'entities_router',
-    'chat_router',
-    'dashboard_router',
-    'health_router',
-    'stream_router',
-    'dark_intel_router',
-    'citation_router',
-    'graph_router',
-    'semantic_router',
-    'insights_router',
-    'executive_router',
-    'healthcare_router',
-    'censys_router',
-    'omniscience_router',
+    "auth", "health", "dashboard", "entities", "graph", "semantic",
+    "axiom", "zola", "chat", "stream", "intel", "insights",
+    "citation", "healthcare", "executive", "security", "censys",
+    "omniscience", "self_improvement",
+    "terminal", "darkweb", "node_control", "exploit", "scanner",
+    "intel_pipeline", "osint", "intelligence", "events",
+    "network", "live", "lan", "apex", "causal_functor",
+    "kronos", "stratum", "pantheon"
 ]

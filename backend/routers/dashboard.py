@@ -36,14 +36,31 @@ async def get_stats():
                     )
                     protocols_active = proto_result.scalar() or 4
 
+                    # Query real active alerts from AlertModel
+                    try:
+                        alerts_res = await session.execute(
+                            select(func.count()).select_from(AlertModel).where(AlertModel.resolved == False)
+                        )
+                        active_alerts = alerts_res.scalar() or 0
+                    except Exception:
+                        active_alerts = len([e for e in entity_registry.get_all() if e.get("status") == "pre-transition"])
+
+                    # Query real entropy average from active entities
+                    all_ents = entity_registry.get_all()
+                    if all_ents:
+                        entropies = [float(e.get("entropy", 0.5)) for e in all_ents if "entropy" in e]
+                        avg_entropy = round(sum(entropies) / len(entropies), 3) if entropies else 0.512
+                    else:
+                        avg_entropy = 0.512
+
                     return {
                         "total_entities": total_companies,
-                        "active_alerts": 0,
+                        "active_alerts": active_alerts,
                         "events_per_second": events_per_second,
                         "protocols_active": protocols_active,
                         "events_processed": events_processed,
                         "uptime_seconds": round(time.time() - START_TIME, 1),
-                        "entropy_average": 0.5,
+                        "entropy_average": avg_entropy,
                     }
         except Exception as e:
             print(f"[DASHBOARD] DB stats query failed, falling back: {e}")

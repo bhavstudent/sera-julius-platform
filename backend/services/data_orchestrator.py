@@ -731,3 +731,4 @@ class DataIngestionService:
                     from scripts.fetch_executive_movements import seed_mock_executive_movements
                     await seed_mock_executive_movements()
                 await session.commit()
+

@@ -233,3 +233,4 @@ class DynamicTickerDiscovery:
             logger.error(f"Error in dynamic ticker discovery flow: {e}", exc_info=True)
             # Safe database fallback: return top default list
             return DEFAULT_UNIVERSE[:n]
+

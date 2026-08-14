@@ -26,13 +26,32 @@ import asyncio
 import logging
 import re
 from datetime import datetime
-
+import random
 import httpx
 
 logger = logging.getLogger("sera.global_intel")
 
-TIMEOUT = httpx.Timeout(3.0, connect=1.5)
-HEADERS = {"User-Agent": "SERA-Platform/2.0 (research@sera-platform.io)"}
+TIMEOUT = httpx.Timeout(5.0, connect=2.0)
+
+
+USER_AGENTS = [
+    "SERA-Platform/2.0 (OSINT Hyper-Pipeline; research@sera-platform.io)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+]
+
+def get_stealth_headers() -> dict:
+    """Returns randomized stealth user-agent headers for unblocked OSINT collection."""
+    return {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+    }
+
+HEADERS = get_stealth_headers()
+
 
 
 # ─── 1. GLEIF – Legal Entity Data ────────────────────────────────────────────
@@ -521,3 +540,4 @@ async def aggregate_company_intel(
     }
     _INTEL_MEM_CACHE[ticker.upper()] = (now, result)
     return result
+

@@ -135,3 +135,4 @@ class DarkIntelService:
             briefings = [b for b in briefings if b["clearance_level"] == target_clearance]
 
         return briefings
+

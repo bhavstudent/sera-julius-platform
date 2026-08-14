@@ -82,3 +82,4 @@ class OmniscienceGuardian:
     @classmethod
     def get_remediation_logs(cls) -> List[Dict[str, Any]]:
         return AutonomousAIEvolver.get_logs()
+

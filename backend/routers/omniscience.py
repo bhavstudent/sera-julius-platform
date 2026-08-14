@@ -65,3 +65,5 @@ async def generate_pdf_report(req: PDFReportRequest):
 async def get_evolution_logs():
     logs = OmniscienceGuardian.get_remediation_logs()
     return {"count": len(logs), "logs": logs}
+
+

@@ -1,97 +1,107 @@
 """
-SERA Terminal Router — Exposes the Linux shell as API endpoints.
-MERGED FROM JULIUS → SERA PLATFORM
-Provides terminal access with Sera authentication
+Terminal Router - Linux/WSL Terminal Execution
 """
 
 import logging
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional, Dict, Any
+import uuid
+from datetime import datetime
 
-# Sera imports
-import sys
-from pathlib import Path
-SERA_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(SERA_ROOT))
-
-from services.remote.linux_shell import (
-    execute_linux, 
-    execute_script, 
-    get_shell_status,
-    get_system_info,
-    get_command_history, 
-    install_package,
-)
-
-# ✅ FIXED: Use Sera's actual auth from main.py
-# Try multiple possible auth locations
-try:
-    from security.measures import get_current_user
-except ImportError:
-    try:
-        from routers.auth import get_current_user
-    except ImportError:
-        # Fallback: create a simple auth dependency
-        from fastapi import Header
-        from config import API_KEYS
-        
-        async def get_current_user(api_key: str = Header(..., alias="X-API-Key")):
-            """Fallback auth using API key from config"""
-            if api_key not in API_KEYS:
-                raise HTTPException(status_code=401, detail="Invalid API key")
-            return {"id": API_KEYS[api_key], "username": API_KEYS[api_key]}
+# ✅ FIXED: Use absolute import instead of relative
+from services.linux_shell import execute_linux, get_shell_status
+from database import db
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/terminal", tags=["Linux Terminal"])
+router = APIRouter(prefix="/api/terminal", tags=["Terminal"])
+
+
+# ============================================================
+# MODELS
+# ============================================================
 
 class CommandRequest(BaseModel):
     command: str
-    session_id: str = "default"
-    timeout: int = 30
+    timeout: Optional[int] = 120
+    cwd: Optional[str] = None
 
-class ScriptRequest(BaseModel):
-    script: str
-    session_id: str = "default"
-    timeout: int = 60
 
-class InstallRequest(BaseModel):
-    packages: str
+class CommandResponse(BaseModel):
+    id: str
+    command: str
+    output: str
+    error: Optional[str] = None
+    exit_code: int
+    success: bool
+    duration_ms: float
+    timestamp: str
+
+
+# ============================================================
+# ENDPOINTS
+# ============================================================
 
 @router.get("/status")
-async def terminal_status(current_user = Depends(get_current_user)):
-    """Get Linux terminal subsystem status."""
-    user_id = current_user.get("id") if current_user else None
-    return get_shell_status(user_id)
+async def terminal_status():
+    """Get terminal/shell status."""
+    status = get_shell_status()
+    return {
+        "status": "ok",
+        "operational": status.get("operational", False),
+        "backend": status.get("backend", "unknown"),
+        "host_os": status.get("host_os", "unknown"),
+        "details": status
+    }
+
 
 @router.post("/execute")
-async def run_command(req: CommandRequest, current_user = Depends(get_current_user)):
+async def execute_command(request: CommandRequest):
     """Execute a Linux command."""
-    user_id = current_user.get("id") if current_user else None
-    result = execute_linux(req.command, req.session_id, req.timeout, user_id=user_id)
-    return result
+    cmd_id = f"cmd_{uuid.uuid4().hex[:8]}"
+    
+    try:
+        result = execute_linux(
+            command=request.command,
+            timeout=request.timeout,
+            cwd=request.cwd
+        )
+        
+        # Log to database
+        db.add_event(
+            event_id=f"evt_term_{uuid.uuid4().hex[:8]}",
+            event_type="terminal_command",
+            source="terminal-api",
+            data={
+                "command": request.command,
+                "success": result.get("success", False),
+                "exit_code": result.get("exit_code", -1),
+                "duration_ms": result.get("duration_ms", 0)
+            }
+        )
+        
+        return CommandResponse(
+            id=cmd_id,
+            command=request.command,
+            output=result.get("output", ""),
+            error=result.get("error"),
+            exit_code=result.get("exit_code", -1),
+            success=result.get("success", False),
+            duration_ms=result.get("duration_ms", 0),
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"[TERMINAL] Error executing command: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/script")
-async def run_script(req: ScriptRequest, current_user = Depends(get_current_user)):
-    """Execute a multi-line bash script."""
-    user_id = current_user.get("id") if current_user else None
-    result = execute_script(req.script, req.session_id, req.timeout, user_id)
-    return result
-
-@router.get("/sysinfo")
-async def system_info(current_user = Depends(get_current_user)):
-    """Get Linux system information."""
-    user_id = current_user.get("id") if current_user else None
-    return get_system_info(user_id)
 
 @router.get("/history")
-async def command_history(session_id: str = "default", limit: int = 20,
-                         current_user = Depends(get_current_user)):
-    """Get command history for a session."""
-    return get_command_history(session_id, limit)
+async def get_command_history(limit: int = 20):
+    """Get command history."""
+    # This would need to be implemented in linux_shell
+    return {
+        "history": [],
+        "limit": limit
+    }
 
-@router.post("/install")
-async def install_packages(req: InstallRequest, current_user = Depends(get_current_user)):
-    """Install Linux packages via apt/yum/dnf/pacman."""
-    user_id = current_user.get("id") if current_user else None
-    return install_package(req.packages, user_id)

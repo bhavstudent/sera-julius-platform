@@ -87,3 +87,4 @@ class InsightEngine:
         except Exception as e:
             logger.error(f"Error calculating purchase intent for {category} in {region}: {e}", exc_info=True)
             return 0.82  # fallback default
+

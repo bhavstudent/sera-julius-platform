@@ -1,315 +1,307 @@
 """
-SERA Workflow Engine — Orchestrates multi-step automated investigations
-========================================================================
-Chains AXIOM, ZOLA, STYX Prime, ALETHEIA, and Entity Resolution subsystems.
-
-Features:
-- Template-based workflow creation
-- Dynamic step execution with context passing
-- Background processing
-- Database logging and tracking
-- Error recovery and retry
+JULIUS Workflow Engine — Orchestrates multi-step automated investigations.
+Chains scanner, exploit, identity, behavioral, darkweb, files, and live subsystems.
 """
-
 import logging
 import json
 import re
 import uuid
 import asyncio
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
-logger = logging.getLogger("sera.workflow_engine")
-
-# ============================================================================
-# WORKFLOW TEMPLATES
-# ============================================================================
+logger = logging.getLogger(__name__)
 
 WORKFLOW_TEMPLATES = {
-    # ─── Entity Analysis ──────────────────────────────────────────────────
-    "entity_analysis": {
-        "name": "Comprehensive Entity Analysis",
-        "description": "Analyze an entity across all SERA subsystems",
+    "recon": {
+        "name": "Target Reconnaissance",
+        "description": "Full reconnaissance on a target IP: scan, IP lookup, CVE check, dark web search",
         "steps": [
-            {"service": "entity", "action": "resolve", "params": {"query": "{{input.entity}}}"}},
-            {"service": "axiom", "action": "entropy", "params": {"entity": "{{input.entity}}}"}},
-            {"service": "zola", "action": "predict", "params": {"entity": "{{input.entity}}}"}},
-            {"service": "security", "action": "assess", "params": {"entity": "{{input.entity}}}"}},
-        ]
+            {"service": "scan", "action": "port_scan", "params": {"target": "{{input.target}}"}},
+            {"service": "live", "action": "ip_lookup", "params": {"ip": "{{input.target}}"}},
+            {"service": "live", "action": "cve_check", "params": {}},
+            {"service": "darkweb", "action": "search", "params": {"query": "{{input.target}}"}},
+        ],
     },
-    
-    # ─── Threat Response ──────────────────────────────────────────────────
-    "threat_response": {
-        "name": "Automated Threat Response",
-        "description": "Respond to detected security threat",
+    "track": {
+        "name": "Attacker Tracking",
+        "description": "Correlate an identity across all data sources",
         "steps": [
-            {"service": "security", "action": "detect", "params": {"target": "{{input.target}}"}},
-            {"service": "security", "action": "score", "params": {}},
-            {"service": "zola", "action": "intervene", "params": {"entity": "{{input.target}}"}},
-            {"service": "aletheia", "action": "verify", "params": {"claim": "{{input.claim}}"}},
-        ]
+            {"service": "identity", "action": "resolve", "params": {"query": "{{input.name}}"}},
+            {"service": "identity", "action": "graph", "params": {}},
+            {"service": "events", "action": "search", "params": {"query": "{{input.name}}"}},
+        ],
     },
-    
-    # ─── Market Intelligence ─────────────────────────────────────────────
-    "market_intelligence": {
-        "name": "Market Intelligence Analysis",
-        "description": "Analyze market signals and generate insights",
+    "incident": {
+        "name": "Incident Response",
+        "description": "Automated investigation of a security incident",
         "steps": [
-            {"service": "entity", "action": "resolve", "params": {"query": "{{input.company}}"}},
-            {"service": "axiom", "action": "entropy", "params": {"entity": "{{input.company}}"}},
-            {"service": "zola", "action": "predict", "params": {"entity": "{{input.company}}"}},
-            {"service": "zola", "action": "brief", "params": {"entity": "{{input.company}}"}},
-        ]
+            {"service": "scan", "action": "port_scan"},
+            {"service": "exploit", "action": "analyze"},
+            {"service": "stratum", "action": "analyze"},
+            {"service": "csie", "action": "infer"},
+            {"service": "causal_functor", "action": "reason"},
+            {"service": "kronos", "action": "scale"},
+            {"service": "axiom", "action": "compress"},
+        ],
     },
-    
-    # ─── Evolution Pipeline ──────────────────────────────────────────────
-    "evolution_pipeline": {
-        "name": "Self-Evolution Pipeline",
-        "description": "Analyze → Generate → Test → Deploy evolution patches",
+    "kronos_pipeline": {
+        "name": "Integrated Security Intelligence Pipeline",
+        "description": "Scanner -> Exploit -> STRATUM -> CSIE -> CAUSAL FUNCTOR -> KRONOS -> AXIOM",
         "steps": [
-            {"service": "evolution", "action": "analyze", "params": {}},
-            {"service": "evolution", "action": "patch", "params": {}},
-            {"service": "evolution", "action": "test", "params": {"patch": "{{step_1_result.patch}}"}},
-            {"service": "evolution", "action": "deploy", "params": {"patch": "{{step_1_result.patch}}", "test": "{{step_2_result.test}}"}},
-        ]
+            {"service": "scan", "action": "port_scan", "params": {}},
+            {"service": "exploit", "action": "run", "params": {}},
+            {"service": "stratum", "action": "analyze", "params": {}},
+            {"service": "csie", "action": "infer", "params": {}},
+            {"service": "causal_functor", "action": "reason", "params": {}},
+            {"service": "kronos", "action": "scale", "params": {}},
+            {"service": "axiom", "action": "compress", "params": {}},
+            {"service": "self_evolution", "action": "analyze", "params": {}},
+        ],
     },
-    
-    # ─── Entity Monitoring ───────────────────────────────────────────────
-    "entity_monitor": {
-        "name": "Entity Monitoring",
-        "description": "Monitor an entity for changes and alerts",
+    "autonomous_pipeline": {
+        "name": "Autonomous Evolution Pipeline",
+        "description": "KRONOS -> AXIOM -> Self Evolution",
         "steps": [
-            {"service": "axiom", "action": "entropy", "params": {"entity": "{{input.entity}}"}},
-            {"service": "axiom", "action": "alerts", "params": {"entity": "{{input.entity}}"}},
-            {"service": "security", "action": "assess", "params": {"entity": "{{input.entity}}"}},
-        ]
-    },
-    
-    # ─── Full Platform Scan ──────────────────────────────────────────────
-    "full_scan": {
-        "name": "Full Platform Scan",
-        "description": "Complete scan of all subsystems",
-        "steps": [
-            {"service": "axiom", "action": "global", "params": {}},
-            {"service": "security", "action": "engagements", "params": {}},
-            {"service": "security", "action": "alerts", "params": {}},
-            {"service": "zola", "action": "dashboard", "params": {}},
-            {"service": "evolution", "action": "status", "params": {}},
-        ]
+            {"service": "kronos", "action": "analyze", "params": {}},
+            {"service": "axiom", "action": "compress", "params": {}},
+            {"service": "self_evolution", "action": "analyze", "params": {}},
+            {"service": "self_evolution", "action": "patch", "params": {}},
+            {"service": "self_evolution", "action": "review", "params": {}}
+        ],
     },
 }
 
 
-# ============================================================================
-# DATABASE HELPERS
-# ============================================================================
-
 def _db():
-    """Get database instance."""
-    try:
-        from database import db
-        return db
-    except ImportError:
-        # Fallback in-memory
-        return None
+    from database import db
+    return db
 
 
-# ============================================================================
-# STEP EXECUTION
-# ============================================================================
+async def execute_workflow(workflow_id: int):
+    """Execute all steps of a workflow sequentially."""
+    db = _db()
+    workflow = db.get_workflow_with_steps(workflow_id)
+    if not workflow:
+        logger.error(f"Workflow {workflow_id} not found")
+        return
+    db.update_workflow_status(workflow_id, "running")
+    context: Dict[str, Any] = {}
+    steps = workflow.get("steps", [])
+    if not steps:
+        actions = workflow.get("actions", [])
+        if isinstance(actions, list):
+            for i, step_def in enumerate(actions):
+                if isinstance(step_def, dict):
+                    db.add_workflow_step(
+                        workflow_id, i,
+                        step_def.get("service", "unknown"),
+                        step_def.get("action", "unknown"),
+                        step_def.get("params", {}),
+                    )
+            steps = db.get_workflow_steps(workflow_id)
+    for step in steps:
+        step_idx = step["step_index"]
+        db.update_workflow_step(workflow_id, step_idx, "running")
+        try:
+            params = _resolve_params(step.get("params", {}), context)
+            result = await _execute_step(step["service"], step["action"], params, context)
+            context[f"step_{step_idx}_result"] = result
+            db.update_workflow_step(workflow_id, step_idx, "completed", result)
+        except Exception as e:
+            logger.error(f"Workflow {workflow_id} step {step_idx} failed: {e}")
+            db.update_workflow_step(workflow_id, step_idx, "failed", {"error": str(e)})
+            db.update_workflow_status(workflow_id, "failed")
+            return
+    db.update_workflow_status(workflow_id, "completed")
+    db.add_event(
+        event_id=f"evt_wf_done_{uuid.uuid4().hex[:8]}",
+        event_type="workflow_completed",
+        source="julius-workflow-engine",
+        data={"workflow_id": workflow_id, "name": workflow["name"], "steps": len(steps)},
+    )
+    logger.info(f"Workflow {workflow_id} completed: {len(steps)} steps")
+    return context
+
 
 async def _execute_step(service: str, action: str, params: dict, context: dict) -> dict:
     """Execute a single workflow step by dispatching to the appropriate service."""
-    logger.info(f"[WORKFLOW] Executing {service}.{action} with params {params}")
-    
-    # ─── AXIOM-Φ Services ──────────────────────────────────────────────────
-    if service == "axiom" and action == "entropy":
+    db = _db()
+    if service == "scan" and action == "port_scan":
+        from ..routers.scanner import _check_port, _detect_vulnerabilities, TOP_PORTS
+        target = params.get("target", "127.0.0.1")
+        scan_id = f"scan_wf_{uuid.uuid4().hex[:8]}"
+        db.create_scan(scan_id, target, "workflow")
+        open_ports = []
+        for port in TOP_PORTS:
+            r = _check_port(target, port, 1.5)
+            if r["status"] == "open":
+                open_ports.append(r)
+        vulns = _detect_vulnerabilities(scan_id, target, open_ports)
+        db.update_scan(scan_id, "completed", {"open_ports": open_ports, "vulnerabilities": vulns})
+        return {"scan_id": scan_id, "open_ports": len(open_ports), "vulnerabilities": len(vulns), "ports": open_ports}
+    elif service == "live" and action == "ip_lookup":
+        import httpx
+        ip = params.get("ip", "127.0.0.1")
+        results = {}
         try:
-            from core.entropy_engine import entropy_engine
-            entity = params.get("entity", "default")
-            stats = entropy_engine.get_entity_stats(entity)
-            return {"status": "success", "stats": stats, "entity": entity}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"http://ip-api.com/json/{ip}")
+                if resp.status_code == 200:
+                    results["geolocation"] = resp.json()
         except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "axiom" and action == "alerts":
+            results["error"] = str(e)
+        return {"ip": ip, "intel": results}
+    elif service == "live" and action == "cve_check":
+        import httpx
         try:
-            from core.entropy_engine import entropy_engine
-            entity = params.get("entity")
-            if entity:
-                stats = entropy_engine.get_entity_stats(entity)
-                return {"status": "success", "alerts": [stats] if stats.get("alert_triggered") else []}
-            else:
-                stats = entropy_engine.get_global_stats()
-                return {"status": "success", "alerts": stats.get("alert_entities", [])}
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get("https://services.nvd.nist.gov/rest/json/cves/2.0", params={"resultsPerPage": 10})
+                data = resp.json()
+            cves = []
+            for item in data.get("vulnerabilities", [])[:10]:
+                cve = item.get("cve", {})
+                cves.append({"id": cve.get("id"), "published": cve.get("published")})
+            return {"cves": cves, "total": data.get("totalResults", 0)}
         except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "axiom" and action == "global":
+            return {"error": str(e)}
+    elif service == "darkweb" and action == "search":
+        query = params.get("query", "")
         try:
-            from core.entropy_engine import entropy_engine
-            stats = entropy_engine.get_global_stats()
-            return {"status": "success", "stats": stats}
+            from ..routers.darkweb import _robin_available, _check_tor
+            if _robin_available:
+                tor = _check_tor()
+                if tor["status"] == "up":
+                    from search import get_search_results
+                    results = get_search_results(query, max_workers=3)
+                    return {"results": len(results), "query": query, "sample": results[:5]}
+            return {"results": 0, "query": query, "note": "Robin/Tor not available"}
         except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── ZOLA Services ────────────────────────────────────────────────────
-    elif service == "zola" and action == "predict":
-        try:
-            from routers.zola import generate_prediction
-            entity = params.get("entity", "default")
-            result = await generate_prediction(entity)
-            return {"status": "success", "prediction": result, "entity": entity}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "zola" and action == "brief":
-        try:
-            from routers.zola import get_brief
-            entity = params.get("entity", "default")
-            result = await get_brief(entity)
-            return {"status": "success", "brief": result, "entity": entity}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "zola" and action == "intervene":
-        try:
-            from routers.zola import model_intervention
-            entity = params.get("entity", "default")
-            request = type('obj', (object,), {
-                'entity_id': entity,
-                'intervention_type': params.get("type", "policy"),
-                'parameters': {},
-                'expected_outcome': None
-            })()
-            result = await model_intervention(request)
-            return {"status": "success", "intervention": result, "entity": entity}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "zola" and action == "dashboard":
-        try:
-            from routers.zola import get_zola_dashboard
-            result = await get_zola_dashboard()
-            return {"status": "success", "dashboard": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── Security Services ────────────────────────────────────────────────
-    elif service == "security" and action == "assess":
-        try:
-            from routers.security import assess_threat
-            target = params.get("entity", params.get("target", "default"))
-            result = await assess_threat(target)
-            return {"status": "success", "assessment": result, "target": target}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "security" and action == "detect":
-        try:
-            from routers.security import detect_threats
-            target = params.get("target", "default")
-            result = await detect_threats(target)
-            return {"status": "success", "threats": result, "target": target}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "security" and action == "score":
-        try:
-            from routers.security import get_cvss_details
-            # Get score from context
-            threats = context.get("step_0_result", {}).get("threats", [])
-            score = threats[0].get("cvss_score", 5.0) if threats else 5.0
-            result = await get_cvss_details(score)
-            return {"status": "success", "cvss": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "security" and action == "engagements":
-        try:
-            from routers.security import get_engagements
-            result = await get_engagements(limit=20)
-            return {"status": "success", "engagements": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "security" and action == "alerts":
-        try:
-            from routers.security import get_alerts
-            result = await get_alerts()
-            return {"status": "success", "alerts": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── Entity Services ──────────────────────────────────────────────────
-    elif service == "entity" and action == "resolve":
-        try:
-            from routers.entities import resolve_entity
-            query = params.get("query", params.get("entity", "default"))
-            result = await resolve_entity(query)
-            return {"status": "success", "entity": result, "query": query}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── ALETHEIA Services ────────────────────────────────────────────────
-    elif service == "aletheia" and action == "verify":
-        try:
-            from routers.citation import verify_claim
-            claim = params.get("claim", "default claim")
-            evidence = params.get("evidence", "")
-            result = await verify_claim(claim, evidence)
-            return {"status": "success", "verification": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── Evolution Services ───────────────────────────────────────────────
-    elif service == "evolution" and action == "analyze":
-        try:
-            from services.self_evolution import self_evolution
-            result = self_evolution.analyze_repository()
-            return {"status": "success", "analysis": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "evolution" and action == "patch":
-        try:
-            from services.self_evolution import self_evolution
-            analysis = context.get("step_0_result", {}).get("analysis", {})
-            result = self_evolution.generate_patch(analysis)
-            return {"status": "success", "patch": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "evolution" and action == "test":
-        try:
-            from services.self_evolution import self_evolution
-            patch = params.get("patch", {})
-            result = self_evolution.test_patch(patch)
-            return {"status": "success", "test": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "evolution" and action == "deploy":
-        try:
-            from services.self_evolution import self_evolution
-            patch = params.get("patch", {})
-            test = params.get("test", {})
-            result = self_evolution.deploy_patch(patch, test)
-            return {"status": "success", "deployment": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    elif service == "evolution" and action == "status":
-        try:
-            from services.self_evolution import self_evolution
-            result = self_evolution.review_queue()
-            return {"status": "success", "status": result}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    # ─── Unknown Service ──────────────────────────────────────────────────
+            return {"error": str(e), "query": query}
+    elif service == "identity" and action == "resolve":
+        query = params.get("query", "")
+        identities = db.get_identities()
+        matches = [i for i in identities if query.lower() in (i.get("name", "").lower() + " " + (i.get("email") or "") + " " + (i.get("handle") or ""))]
+        return {"query": query, "matches": len(matches), "identities": matches[:10]}
+    elif service == "identity" and action == "graph":
+        from ..routers.identity import _build_graph
+        graph = _build_graph()
+        return {"nodes": len(graph.get("nodes", [])), "edges": len(graph.get("edges", []))}
+    elif service == "behavioral" and action == "check_patterns":
+        patterns = db.get_behavioral_patterns()
+        alerts = db.get_behavioral_alerts(20)
+        return {"patterns": len(patterns), "recent_alerts": len(alerts)}
+    elif service == "events" and action in ("recent", "search"):
+        events = db.get_recent_events(50)
+        query = params.get("query", "")
+        if query:
+            events = [e for e in events if query.lower() in json.dumps(e).lower()]
+        return {"events": len(events), "sample": events[:10]}
+    elif service == "stratum" and action == "analyze":
+        from .stratum_omnis import get_stratum_runtime
+        return {
+            "status": "success",
+            "runtime": get_stratum_runtime(),
+        }
+    elif service == "csie" and action == "infer":
+        from .stratum_omnis import get_csie_snapshot
+        return {
+            "status": "success",
+            "csie": get_csie_snapshot(),
+        }
+    elif service == "causal_functor" and action == "reason":
+        from .causal_functor import get_causal_functor_diagnostics
+        return {
+            "status": "success",
+            "diagnostics": get_causal_functor_diagnostics(),
+        }
+    elif service == "kronos" and action == "scale":
+        from .kronos_service import KronosService
+        service_obj = KronosService()
+        return {
+            "status": "success",
+            "kronos_status": service_obj.get_status(),
+            "kronos_analysis": service_obj.analyze(),
+        }
+    elif service == "kronos" and action == "analyze":
+        from .kronos_service import KronosService
+        engine = KronosService()
+        return {
+            "status": "success",
+            "analysis": engine.analyze(),
+        }
+    elif service == "axiom" and action == "compress":
+        from .axiom.axiom_compressor import compression_report
+        return {
+            "status": "success",
+            "compression_results": compression_report(),
+        }
+    elif service == "self_evolution" and action == "analyze":
+        from .self_evolution import SelfEvolution
+        engine = SelfEvolution()
+        return {
+            "status": "success",
+            "analysis": engine.analyze_repository(),
+        }
+    elif service == "self_evolution" and action == "patch":
+        from .self_evolution import SelfEvolution
+        engine = SelfEvolution()
+        return {
+            "status": "success",
+            "patch": engine.generate_patch(),
+        }
+    elif service == "self_evolution" and action == "review":
+        from .self_evolution import SelfEvolution
+        engine = SelfEvolution()
+        return {
+            "status": "success",
+            "review": engine.review_queue(),
+        }
+    elif service == "exploit" and action == "analyze":
+        scan_data = context.get("step_0_result", {})
+        ports = scan_data.get("ports", [])
+        findings = []
+
+        service_map = {
+            "mysql": {
+                "module": "mysql_default_creds",
+                "risk": "high"
+            },
+            "microsoft-ds": {
+                "module": "smb_null_session",
+                "risk": "medium"
+            },
+            "http": {
+                "module": "http_dir_traversal",
+                "risk": "high"
+            },
+            "https": {
+                "module": "ssl_vulns",
+                "risk": "medium"
+            },
+            "dns": {
+                "module": "dns_zone_transfer",
+                "risk": "high"
+            }
+        }
+
+        for port_info in ports:
+            service_name = port_info.get("service")
+            if service_name in service_map:
+                findings.append({
+                    "port": port_info.get("port"),
+                    "service": service_name,
+                    "recommended_module": service_map[service_name]["module"],
+                    "risk": service_map[service_name]["risk"]
+                })
+
+        return {
+            "status": "success",
+            "ports_analyzed": len(ports),
+            "recommendations": findings
+        }
     else:
-        return {"status": "error", "error": f"Unknown service/action: {service}/{action}"}
+        return {"error": f"Unknown service/action: {service}/{action}"}
 
 
 def _resolve_params(params: dict, context: dict) -> dict:
@@ -331,98 +323,19 @@ def _resolve_params(params: dict, context: dict) -> dict:
     return resolved
 
 
-# ============================================================================
-# WORKFLOW EXECUTION
-# ============================================================================
-
-async def execute_workflow(workflow_id: int) -> Dict:
-    """Execute all steps of a workflow sequentially."""
-    db = _db()
-    
-    if db:
-        workflow = db.get_workflow_with_steps(workflow_id)
-        if not workflow:
-            logger.error(f"[WORKFLOW] Workflow {workflow_id} not found")
-            return {"status": "error", "message": f"Workflow {workflow_id} not found"}
-        
-        db.update_workflow_status(workflow_id, "running")
-    else:
-        # In-memory fallback
-        workflow = {"id": workflow_id, "name": "workflow", "steps": []}
-    
-    context: Dict[str, Any] = {}
-    steps = workflow.get("steps", [])
-    
-    if not steps:
-        actions = workflow.get("actions", [])
-        if isinstance(actions, list):
-            for i, step_def in enumerate(actions):
-                if isinstance(step_def, dict):
-                    if db:
-                        db.add_workflow_step(
-                            workflow_id, i,
-                            step_def.get("service", "unknown"),
-                            step_def.get("action", "unknown"),
-                            step_def.get("params", {}),
-                        )
-            if db:
-                steps = db.get_workflow_steps(workflow_id)
-    
-    for step in steps:
-        step_idx = step.get("step_index", 0)
-        
-        if db:
-            db.update_workflow_step(workflow_id, step_idx, "running")
-        
-        try:
-            params = _resolve_params(step.get("params", {}), context)
-            result = await _execute_step(step["service"], step["action"], params, context)
-            context[f"step_{step_idx}_result"] = result
-            
-            if db:
-                db.update_workflow_step(workflow_id, step_idx, "completed", result)
-                
-        except Exception as e:
-            logger.error(f"[WORKFLOW] Workflow {workflow_id} step {step_idx} failed: {e}")
-            if db:
-                db.update_workflow_step(workflow_id, step_idx, "failed", {"error": str(e)})
-                db.update_workflow_status(workflow_id, "failed")
-            return {"status": "error", "step": step_idx, "error": str(e)}
-    
-    if db:
-        db.update_workflow_status(workflow_id, "completed")
-        db.add_event(
-            event_id=f"evt_wf_done_{uuid.uuid4().hex[:8]}",
-            event_type="workflow_completed",
-            source="julius-workflow-engine",
-            data={"workflow_id": workflow_id, "name": workflow.get("name"), "steps": len(steps)},
-        )
-    
-    logger.info(f"[WORKFLOW] Workflow {workflow_id} completed: {len(steps)} steps")
-    return {"status": "success", "completed": True, "steps": len(steps), "context": context}
-
-
 def create_from_template(template_name: str, input_params: dict) -> Optional[int]:
     """Create a workflow from a named template with input parameters."""
     template = WORKFLOW_TEMPLATES.get(template_name)
     if not template:
-        logger.error(f"[WORKFLOW] Template {template_name} not found")
         return None
-    
     db = _db()
-    if not db:
-        logger.error("[WORKFLOW] Database not available")
-        return None
-    
     result = db.add_workflow(
         name=f"{template['name']} - {datetime.utcnow().strftime('%H:%M')}",
         description=template["description"],
         trigger_type="template",
         actions=template["steps"],
     )
-    
     workflow_id = result["id"]
-    
     for i, step_def in enumerate(template["steps"]):
         params = step_def.get("params", {})
         resolved = {}
@@ -433,59 +346,6 @@ def create_from_template(template_name: str, input_params: dict) -> Optional[int
             else:
                 resolved[k] = v
         db.add_workflow_step(workflow_id, i, step_def["service"], step_def["action"], resolved)
-    
-    logger.info(f"[WORKFLOW] Created workflow {workflow_id} from template {template_name}")
     return workflow_id
 
 
-# ============================================================================
-# WORKFLOW STATUS
-# ============================================================================
-
-def get_workflow_status(workflow_id: int) -> Dict:
-    """Get the status of a workflow."""
-    db = _db()
-    if not db:
-        return {"status": "error", "message": "Database not available"}
-    
-    workflow = db.get_workflow_with_steps(workflow_id)
-    if not workflow:
-        return {"status": "error", "message": f"Workflow {workflow_id} not found"}
-    
-    steps = workflow.get("steps", [])
-    completed = sum(1 for s in steps if s.get("status") == "completed")
-    total = len(steps)
-    
-    return {
-        "workflow_id": workflow_id,
-        "name": workflow.get("name"),
-        "status": workflow.get("status", "unknown"),
-        "progress": f"{completed}/{total}",
-        "steps": steps
-    }
-
-
-def list_workflows(limit: int = 20) -> List[Dict]:
-    """List recent workflows."""
-    db = _db()
-    if not db:
-        return []
-    
-    workflows = db.get_workflows(limit=limit)
-    return [
-        {
-            "id": w.get("id"),
-            "name": w.get("name"),
-            "status": w.get("status"),
-            "created_at": w.get("created_at"),
-            "steps": len(w.get("steps", []))
-        }
-        for w in workflows
-    ]
-
-
-# ============================================================================
-# INITIALIZATION
-# ============================================================================
-
-logger.info("[WORKFLOW] Workflow engine initialized with %d templates", len(WORKFLOW_TEMPLATES))

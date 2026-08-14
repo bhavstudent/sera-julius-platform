@@ -130,3 +130,4 @@ class VectorStoreService:
         }
         date_id = date.strftime('%Y%m%d') if hasattr(date, 'strftime') else '2026'
         cls.add_document(f"filing_{ticker}_{date_id}", text, metadata)
+

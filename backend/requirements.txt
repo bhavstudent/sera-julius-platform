@@ -92,7 +92,7 @@ python-whois==0.9.4
 googlesearch-python==1.2.5
 shodan==1.31.0
 web3==6.20.0
-eth-account==0.13.1
+eth-account==0.12.2
 torpy==1.1.6
 
 # Monitoring & Analysis
