@@ -84,7 +84,7 @@ playwright==1.47.0
 
 # Reconnaissance & Scanning
 python-nmap==0.7.1
-python-masscan==0.2.0
+python-masscan>=0.1.6
 dnspython==2.6.1
 python-whois==0.9.4
 
